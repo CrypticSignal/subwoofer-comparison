@@ -94,8 +94,10 @@ const fetchData = async () => {
   );
   // Remove the row for the column names
   subsWithOutputData.shift();
+  console.log(subsWithOutputData);
   // Give each subwoofer an id
   subsWithOutputData.forEach((sub, index) => (sub.id = index));
+  console.log(subsWithOutputData);
 
   return subsWithOutputData;
 };
@@ -187,8 +189,8 @@ onBeforeMount(async () => {
         <table class="border">
           <thead>
             <tr>
-              <th class="text-left">Select</th>
-              <th class="text-left" v-for="columnName in columns" :key="columnName">
+              <th class="text-center">Select</th>
+              <th class="text-center border" v-for="columnName in columns" :key="columnName">
                 {{ columnName }}
               </th>
             </tr>
@@ -201,37 +203,37 @@ onBeforeMount(async () => {
               </td>
             </tr>
             <tr
-              class="border"
+              :class="selectedSubwooferIDs.has(subwoofer.id) ? 'bg-green-100' : 'bg-white'"
               v-for="subwoofer in subsFilteredByMake"
               :key="subwoofer.id"
               @click="() => handleSubSelected(subwoofer)"
             >
-              <td>
+              <td class="text-center">
                 <input
                   type="checkbox"
                   :checked="isSelected(subwoofer)"
                   @change="(event) => handleChecked(event, subwoofer)"
                 />
               </td>
-              <td>{{ subwoofer.values[0].formattedValue }}</td>
-              <td>{{ subwoofer.values[1].formattedValue }}</td>
-              <td>{{ subwoofer.values[2].formattedValue }}</td>
-              <td>{{ subwoofer.values[3].formattedValue }}</td>
-              <td>{{ subwoofer.values[4].formattedValue }}</td>
-              <td>{{ subwoofer.values[5].formattedValue }}</td>
-              <td>{{ subwoofer.values[6].formattedValue }}</td>
-              <td>{{ subwoofer.values[7].formattedValue }}</td>
-              <td>{{ subwoofer.values[8].formattedValue }}</td>
-              <td>{{ subwoofer.values[9].formattedValue }}</td>
-              <td>{{ subwoofer.values[10].formattedValue }}</td>
-              <td>{{ subwoofer.values[11].formattedValue }}</td>
-              <td>{{ subwoofer.values[12].formattedValue }}</td>
-              <td>{{ subwoofer.values[13].formattedValue }}</td>
-              <td>{{ subwoofer.values[14].formattedValue }}</td>
-              <td>{{ subwoofer.values[15].formattedValue }}</td>
-              <td>{{ subwoofer.values[16].formattedValue }}</td>
-              <td>{{ subwoofer.values[17].formattedValue }}</td>
-              <td>{{ subwoofer.values[18].formattedValue }}</td>
+              <td class="text-center border">{{ subwoofer.values[0].formattedValue }}</td>
+              <td class="text-center border">{{ subwoofer.values[1].formattedValue }}</td>
+              <td class="text-center border">{{ subwoofer.values[2].formattedValue }}</td>
+              <td class="text-center border">{{ subwoofer.values[3].formattedValue }}</td>
+              <td class="text-center border">{{ subwoofer.values[4].formattedValue }}</td>
+              <td class="text-center border">{{ subwoofer.values[5].formattedValue }}</td>
+              <td class="text-center border">{{ subwoofer.values[6].formattedValue }}</td>
+              <td class="text-center border">{{ subwoofer.values[7].formattedValue }}</td>
+              <td class="text-center border">{{ subwoofer.values[8].formattedValue }}</td>
+              <td class="text-center border">{{ subwoofer.values[9].formattedValue }}</td>
+              <td class="text-center border">{{ subwoofer.values[10].formattedValue }}</td>
+              <td class="text-center border">{{ subwoofer.values[11].formattedValue }}</td>
+              <td class="text-center border">{{ subwoofer.values[12].formattedValue }}</td>
+              <td class="text-center border">{{ subwoofer.values[13].formattedValue }}</td>
+              <td class="text-center border">{{ subwoofer.values[14].formattedValue }}</td>
+              <td class="text-center border">{{ subwoofer.values[15].formattedValue }}</td>
+              <td class="text-center border">{{ subwoofer.values[16].formattedValue }}</td>
+              <td class="text-center border">{{ subwoofer.values[17].formattedValue }}</td>
+              <td class="text-center border">{{ subwoofer.values[18].formattedValue }}</td>
             </tr>
           </tbody>
         </table>
@@ -244,36 +246,39 @@ onBeforeMount(async () => {
         </pane>
         <pane>
           <div v-if="subwoofersSelected.length > 0" class="h-40v overflow-auto">
-            <table class="border">
+            <table>
               <thead>
                 <tr>
-                  <th class="text-left" v-for="columnName in columnsSubSelected" :key="columnName">
+                  <th
+                    class="text-left border"
+                    v-for="columnName in columnsSubSelected"
+                    :key="columnName"
+                  >
                     {{ columnName }}
                   </th>
                 </tr>
               </thead>
               <tbody>
                 <tr
-                  class="border"
                   v-for="subwoofer in subwoofersSelected"
                   :key="subwoofer._uniqueKey"
                   @click="() => handleSubSelected(subwoofer)"
                 >
-                  <td>{{ subwoofer.values[1].formattedValue }}</td>
-                  <td>{{ subwoofer.values[5].formattedValue }}</td>
-                  <td>{{ subwoofer.values[6].formattedValue }}</td>
-                  <td>{{ subwoofer.values[7].formattedValue }}</td>
-                  <td>{{ subwoofer.values[8].formattedValue }}</td>
-                  <td>{{ subwoofer.values[9].formattedValue }}</td>
-                  <td>{{ subwoofer.values[10].formattedValue }}</td>
-                  <td>{{ subwoofer.values[11].formattedValue }}</td>
-                  <td>{{ subwoofer.values[12].formattedValue }}</td>
-                  <td>{{ subwoofer.values[13].formattedValue }}</td>
-                  <td>{{ subwoofer.values[14].formattedValue }}</td>
-                  <td>{{ subwoofer.values[15].formattedValue }}</td>
-                  <td>{{ subwoofer.values[16].formattedValue }}</td>
-                  <td>{{ subwoofer.values[17].formattedValue }}</td>
-                  <td>{{ subwoofer.values[18].formattedValue }}</td>
+                  <td class="text-center border">{{ subwoofer.values[1].formattedValue }}</td>
+                  <td class="text-center border">{{ subwoofer.values[5].formattedValue }}</td>
+                  <td class="text-center border">{{ subwoofer.values[6].formattedValue }}</td>
+                  <td class="text-center border">{{ subwoofer.values[7].formattedValue }}</td>
+                  <td class="text-center border">{{ subwoofer.values[8].formattedValue }}</td>
+                  <td class="text-center border">{{ subwoofer.values[9].formattedValue }}</td>
+                  <td class="text-center border">{{ subwoofer.values[10].formattedValue }}</td>
+                  <td class="text-center border">{{ subwoofer.values[11].formattedValue }}</td>
+                  <td class="text-center border">{{ subwoofer.values[12].formattedValue }}</td>
+                  <td class="text-center border">{{ subwoofer.values[13].formattedValue }}</td>
+                  <td class="text-center border">{{ subwoofer.values[14].formattedValue }}</td>
+                  <td class="text-center border">{{ subwoofer.values[15].formattedValue }}</td>
+                  <td class="text-center border">{{ subwoofer.values[16].formattedValue }}</td>
+                  <td class="text-center border">{{ subwoofer.values[17].formattedValue }}</td>
+                  <td class="text-center border">{{ subwoofer.values[18].formattedValue }}</td>
                 </tr>
               </tbody>
             </table>
