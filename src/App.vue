@@ -68,7 +68,6 @@ const columnsSubSelected = [
 ];
 
 const fetchData = async () => {
-  console.log(import.meta.env.VITE_API_KEY);
   console.log("Making a request using Google Sheets API...");
   const response = await fetch(
     `https://sheets.googleapis.com/v4/spreadsheets/1dU5OOnf3nVgctJszmfyBjaxK69dkXte6ZL6anVTW2_M?includeGridData=true&ranges=CEA-2010-A!A1%3ABP2214&key=${
@@ -78,6 +77,7 @@ const fetchData = async () => {
 
   const json = await response.json();
   const allRows = json.sheets[0].data[0].rowData;
+  console.log(allRows);
 
   // Delete the elements from index 19 to index 54
   const deleteCount1 = 54 - 19 + 1;
@@ -191,7 +191,7 @@ onBeforeMount(async () => {
             <tr v-show="subsFilteredByMake.length === 0">
               <td>
                 <p v-if="filterText">No matches found</p>
-                <p v-else>Loading...</p>
+                <p v-else>Retrieving subwoofers...</p>
               </td>
             </tr>
             <tr

@@ -1,6 +1,6 @@
 {
   "name": "subwoofer-comparison",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,12 +11,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "axios": "^1.7.3",
     "chart.js": "^4.4.3",
     "splitpanes": "^3.1.5",
     "vue": "^3.4.29",
-    "vue-chartjs": "^5.3.1",
-    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+    "vue-chartjs": "^5.3.1"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.5",

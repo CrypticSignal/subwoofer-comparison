@@ -24,16 +24,4 @@ const props = defineProps({
     required: true,
   },
 });
-
-watch(
-  () => props.chartData,
-  (newVal) => {
-    console.log("chartData changed:", newVal);
-  },
-  { deep: true }
-);
-
-onMounted(() => {
-  console.log("Initial chartData:", props.chartData);
-});
 </script>
