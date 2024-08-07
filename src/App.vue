@@ -175,7 +175,7 @@ onBeforeMount(async () => {
 </script>
 
 <template>
-  <p class="text-center">CEA-2010-A Data</p>
+  <p class="text-center">CEA-2010-A | 2m peak SPL</p>
   <splitpanes class="default-theme">
     <pane max-size="50">
       <input @input="handleInput" type="text" placeholder="Filter by make" />
