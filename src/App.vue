@@ -87,8 +87,11 @@ const fetchData = async () => {
   allRows.forEach((row) => row.values.splice(2, deleteCount2));
   // Delete the elements from index 5 to index 6
   allRows.forEach((row) => row.values.splice(5, 2));
-
-  const subsWithOutputData = allRows.filter((row) => row.values[5].formattedValue);
+  // Only keep the subs that have a source for the CEA-2010-A data
+  // which is not 'See tab "Others"'
+  const subsWithOutputData = allRows.filter(
+    (row) => row.values[5].formattedValue && !row.values[5].formattedValue.includes("See tab")
+  );
   // Remove the row for the column names
   subsWithOutputData.shift();
   // Give each subwoofer an id
@@ -177,6 +180,9 @@ onBeforeMount(async () => {
   <splitpanes class="default-theme">
     <pane max-size="50">
       <input @input="handleInput" type="text" placeholder="Filter by make" />
+      <span class="ml-2" v-if="subsFilteredByMake.length"
+        >{{ subsFilteredByMake.length }} subwoofers found.</span
+      >
       <div class="h-90v overflow-auto">
         <table class="border">
           <thead>
