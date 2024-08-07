@@ -77,7 +77,6 @@ const fetchData = async () => {
 
   const json = await response.json();
   const allRows = json.sheets[0].data[0].rowData;
-  console.log(allRows);
 
   // Delete the elements from index 19 to index 54
   const deleteCount1 = 54 - 19 + 1;
@@ -94,10 +93,8 @@ const fetchData = async () => {
   );
   // Remove the row for the column names
   subsWithOutputData.shift();
-  console.log(subsWithOutputData);
   // Give each subwoofer an id
   subsWithOutputData.forEach((sub, index) => (sub.id = index));
-  console.log(subsWithOutputData);
 
   return subsWithOutputData;
 };
@@ -250,7 +247,7 @@ onBeforeMount(async () => {
               <thead>
                 <tr>
                   <th
-                    class="text-left border"
+                    class="text-center border"
                     v-for="columnName in columnsSubSelected"
                     :key="columnName"
                   >
