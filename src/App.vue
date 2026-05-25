@@ -5,7 +5,7 @@ import { Splitpanes, Pane } from "splitpanes";
 import "splitpanes/dist/splitpanes.css";
 
 const subwoofersSelected = ref([]);
-const selectedSubwooferIDs = ref(new Set());
+const selectedSubwooferIDs = ref([]); // store ids in an array for reliable reactivity
 const unfilteredSubs = ref([]);
 const filterBrandText = ref("");
 const filterModelText = ref("");
@@ -54,11 +54,14 @@ const visibleSubSelectedColumns = computed(() =>
 );
 
 function toggleColumnVisibility(columnName) {
-  if (visibleColumns.value.has(columnName)) {
-    visibleColumns.value.delete(columnName);
+  // mutate then reassign a new Set to ensure Vue tracks the change
+  const set = new Set(visibleColumns.value);
+  if (set.has(columnName)) {
+    set.delete(columnName);
   } else {
-    visibleColumns.value.add(columnName);
+    set.add(columnName);
   }
+  visibleColumns.value = set;
 }
 
 const fetchData = async () => {
@@ -124,21 +127,19 @@ function generateRandomHexColor() {
 }
 
 function selectSubwoofer(subwoofer) {
-  if (selectedSubwooferIDs.value.has(subwoofer.id)) {
-    return;
-  }
+  if (selectedSubwooferIDs.value.includes(subwoofer.id)) return;
 
   const label = `${getValue(subwoofer, 0)} ${getValue(subwoofer, 1)}`;
   const data = Array.from({ length: 12 }, (_, i) => parseFloat(getValue(subwoofer, i + 7)) || 0);
 
-  selectedSubwooferIDs.value.add(subwoofer.id);
+  selectedSubwooferIDs.value = [...selectedSubwooferIDs.value, subwoofer.id];
   subwoofersSelected.value.push(subwoofer);
   const newDatasets = [...chartData.value.datasets, { id: subwoofer.id, label, data, borderColor: generateRandomHexColor() }];
   chartData.value = { ...chartData.value, datasets: newDatasets };
 }
 
 function deselectSubwoofer(subwoofer) {
-  selectedSubwooferIDs.value.delete(subwoofer.id);
+  selectedSubwooferIDs.value = selectedSubwooferIDs.value.filter((id) => id !== subwoofer.id);
   subwoofersSelected.value = subwoofersSelected.value.filter((sub) => sub.id !== subwoofer.id);
   const filteredDatasets = chartData.value.datasets.filter((dataset) => dataset.id !== subwoofer.id);
   chartData.value = { ...chartData.value, datasets: filteredDatasets };
@@ -157,18 +158,17 @@ function handleChecked(event, subwoofer) {
     selectSubwoofer(subwoofer);
     return;
   }
-
   deselectSubwoofer(subwoofer);
 }
 
 function clearSelections() {
-  selectedSubwooferIDs.value = new Set();
+  selectedSubwooferIDs.value = [];
   subwoofersSelected.value = [];
   chartData.value.datasets = [];
 }
 
 function isSelected(subwoofer) {
-  return selectedSubwooferIDs.value.has(subwoofer.id);
+  return selectedSubwooferIDs.value.includes(subwoofer.id);
 }
 
 onMounted(async () => {
@@ -190,55 +190,55 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="app-shell">
-    <div v-if="loading" class="loader-screen">
-      <div class="loader-card">
-        <div class="loader-spinner"></div>
-        <p>Getting subwoofer data…</p>
+  <main class="flex min-h-screen flex-col gap-6 p-5 max-md:p-4">
+    <div v-if="loading" class="flex min-h-[calc(100vh-2.5rem)] items-center justify-center">
+      <div class="flex flex-col items-center gap-4 rounded-[1.25rem] bg-white/95 px-10 py-8 shadow-[0_24px_60px_rgba(15,23,42,0.15)]">
+        <div class="h-12 w-12 animate-spin rounded-full border-[0.45rem] border-blue-500/20 border-t-blue-500"></div>
+        <p>Getting data...</p>
       </div>
     </div>
 
-    <div v-else class="app-content">
-      <section class="hero-banner">
+    <div v-else>
+      <section class="mb-6 flex items-center justify-between gap-4 rounded-3xl bg-slate-900/90 px-5 py-6 text-white shadow-[0_18px_60px_rgba(15,23,42,0.15)] max-lg:flex-col max-lg:items-start max-md:p-5">
       <div>
-        <p class="eyebrow">CEA-2010-A | 2m peak SPL</p>
-        <h1>Subwoofer Comparison</h1>
-        <i class="hero-copy">Source: Subwoofer Comparison Spreadsheet made by sweetchaos on Audio Science Review.</i>
+        <p class="mb-2 text-xs uppercase tracking-[0.25em] opacity-85">CEA-2010-A | 2m peak SPL</p>
+        <h1 class="m-0 text-4xl font-bold leading-tight lg:text-[2.75rem]">Subwoofer Comparison</h1>
+        <i class="mt-2 block max-w-2xl text-slate-200/95">Source: Subwoofer Comparison Spreadsheet made by sweetchaos on Audio Science Review.</i>
       </div>
-      <div class="hero-stats">
-        <span>{{ subsFiltered.length }} subwoofers</span>
-        <button class="clear-btn" @click="clearSelections" :disabled="subwoofersSelected.length === 0">Clear selection</button>
+      <div class="flex flex-wrap items-center gap-4 max-lg:w-full max-lg:justify-between">
+        <span class="text-base font-semibold">{{ subsFiltered.length }} subwoofers</span>
+        <button class="cursor-pointer rounded-[0.85rem] border border-slate-400/35 bg-white px-4 py-3 text-[0.95rem] font-semibold text-slate-900 transition duration-200 hover:-translate-y-px hover:disabled:translate-y-0 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:opacity-55" @click="clearSelections" :disabled="subwoofersSelected.length === 0">Clear selection</button>
       </div>
     </section>
 
-    <splitpanes class="default-theme app-splitpanes" :horizontal="isMobile">
-      <pane max-size="55" class="pane-panel">
-        <section class="panel card">
-          <div class="controls">
-            <input v-model="filterBrandText" type="text" placeholder="Filter by brand" aria-label="Filter by brand" />
-            <input v-model="filterModelText" type="text" placeholder="Filter by model" aria-label="Filter by model" />
-            <select v-model="filterType" aria-label="Filter by type">
+    <splitpanes class="default-theme max-md:min-h-0 max-md:[&.splitpanes--horizontal]:flex-col max-md:[&.splitpanes--horizontal>.splitpanes__pane:first-child]:order-2 max-md:[&.splitpanes--horizontal>.splitpanes__pane:last-child]:order-1 max-md:[&.splitpanes--horizontal>.splitpanes__splitter]:order-3" :horizontal="isMobile">
+      <pane max-size="55" class="p-1 max-md:p-0">
+        <section class="rounded-[1.25rem] bg-white/90 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
+          <div class="mb-4 grid grid-cols-2 gap-3 max-lg:grid-cols-1">
+            <input v-model="filterBrandText" class="rounded-[0.85rem] border border-slate-400/35 bg-white px-4 py-3 text-[0.95rem] transition duration-200 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15" type="text" placeholder="Filter by brand" aria-label="Filter by brand" />
+            <input v-model="filterModelText" class="rounded-[0.85rem] border border-slate-400/35 bg-white px-4 py-3 text-[0.95rem] transition duration-200 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15" type="text" placeholder="Filter by model" aria-label="Filter by model" />
+            <select v-model="filterType" class="rounded-[0.85rem] border border-slate-400/35 bg-white px-4 py-3 text-[0.95rem] transition duration-200 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15" aria-label="Filter by type">
               <option v-for="type in availableTypes" :key="type" :value="type">
                 {{ type === "all" ? "All types" : type }}
               </option>
             </select>
-            <select v-model="sortBy" aria-label="Sort by">
+            <select v-model="sortBy" class="rounded-[0.85rem] border border-slate-400/35 bg-white px-4 py-3 text-[0.95rem] transition duration-200 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15" aria-label="Sort by">
               <option value="brand">Sort: Brand</option>
               <option value="model">Sort: Model</option>
               <option value="type">Sort: Type</option>
               <option value="output20hz">Sort: 20Hz Output</option>
             </select>
-            <button class="sort-toggle" @click="sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'">
+            <button class="cursor-pointer rounded-[0.85rem] border border-slate-400/35 bg-white px-4 py-3 text-[0.95rem] font-semibold text-slate-900 transition duration-200 hover:-translate-y-px focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15" @click="sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'">
               {{ sortDirection === 'asc' ? 'Ascending' : 'Descending' }}
             </button>
-            <div class="column-controls">
-              <span class="column-controls-label">Visible columns</span>
-              <div class="column-checkboxes">
-                <label v-for="columnName in columns" :key="columnName" class="column-checkbox">
+            <div class="col-span-2 grid gap-3 max-lg:col-span-1">
+              <span class="text-sm font-semibold text-gray-600">Visible columns</span>
+              <div class="flex flex-wrap gap-2">
+                <label v-for="columnName in columns" :key="columnName" class="inline-flex items-center gap-1.5 rounded-[0.85rem] bg-slate-400/10 px-3 py-2 text-[0.82rem] text-slate-700">
                   <input
                     type="checkbox"
                     :checked="visibleColumns.has(columnName)"
-                    @change="() => toggleColumnVisibility(columnName)"
+                    @change="toggleColumnVisibility(columnName)"
                   />
                   <span>{{ columnName }}</span>
                 </label>
@@ -246,28 +246,28 @@ onMounted(async () => {
             </div>
           </div>
 
-          <div class="table-container">
-            <table class="data-table">
+          <div class="overflow-x-auto rounded-2xl bg-white p-2">
+            <table class="w-full min-w-full border-collapse">
               <thead>
                 <tr>
-                  <th class="text-center sticky top-0 bg-slate-100">Select</th>
-                  <th class="text-center sticky top-0 bg-slate-100" v-for="column in visibleColumnsArray" :key="column.name">{{ column.name }}</th>
+                  <th class="sticky top-0 border-b-2 border-slate-400/20 bg-slate-100 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700">Select</th>
+                  <th class="sticky top-0 border-b-2 border-slate-400/20 bg-slate-100 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700" v-for="column in visibleColumnsArray" :key="column.name">{{ column.name }}</th>
                 </tr>
               </thead>
               <tbody>
-                <tr v-if="subsFiltered.length === 0" class="empty-row">
-                  <td :colspan="visibleColumnsArray.length + 1" class="text-center py-10">
+                <tr v-if="subsFiltered.length === 0">
+                  <td :colspan="visibleColumnsArray.length + 1" class="px-4 py-12 text-center text-slate-500">
                     <p v-if="filterBrandText || filterModelText">No matches found.</p>
-                    <p v-else>Loading subwoofers…</p>
+                    <p v-else>Loading subwoofers...</p>
                   </td>
                 </tr>
                 <tr
                   v-for="subwoofer in subsFiltered"
                   :key="subwoofer.id"
-                  :class="['data-row', isSelected(subwoofer) ? 'selected-row' : '']"
+                  :class="['cursor-pointer transition-colors duration-150 hover:bg-slate-50', isSelected(subwoofer) ? 'bg-emerald-500/10' : '']"
                   @click="toggleSelection(subwoofer)"
                 >
-                  <td class="text-center">
+                  <td class="border-b border-slate-400/20 px-3 py-3 text-center text-sm">
                     <input
                       type="checkbox"
                       :checked="isSelected(subwoofer)"
@@ -275,7 +275,7 @@ onMounted(async () => {
                       @click.stop
                     />
                   </td>
-                  <td class="text-center" v-for="column in visibleColumnsArray" :key="`${subwoofer.id}-${column.index}`">{{ getValue(subwoofer, column.index) }}</td>
+                  <td class="border-b border-slate-400/20 px-3 py-3 text-center text-sm" v-for="column in visibleColumnsArray" :key="`${subwoofer.id}-${column.index}`">{{ getValue(subwoofer, column.index) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -283,32 +283,32 @@ onMounted(async () => {
         </section>
       </pane>
 
-      <pane class="pane-panel">
-        <div class="panel-group">
-          <section class="panel card chart-panel">
-            <div class="chart-content">
+      <pane class="p-1 max-md:p-0">
+        <div class="flex flex-col gap-4">
+          <section class="flex min-h-96 flex-col rounded-[1.25rem] bg-white/90 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
+            <div class="flex min-h-64 flex-1 items-stretch justify-center py-2">
               <Graph v-if="chartData.datasets.length > 0" :chartData="chartData" />
-              <p v-else class="placeholder-text">Select one or more subwoofers to compare output curves.</p>
+              <p v-else class="text-center leading-7 text-slate-500">Select one or more subwoofers to compare output curves.</p>
             </div>
           </section>
 
-          <section class="panel card specs-panel">
-            <h2 class="panel-title">Selected Subwoofers</h2>
-            <div v-if="subwoofersSelected.length > 0" class="table-container">
-              <table class="data-table compact">
+          <section class="overflow-hidden rounded-[1.25rem] bg-white/90 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
+            <h2 class="mb-3 text-base font-bold">Selected Subwoofers</h2>
+            <div v-if="subwoofersSelected.length > 0" class="overflow-x-auto rounded-2xl bg-white p-2">
+              <table class="w-full min-w-full border-collapse">
                 <thead>
                   <tr>
-                    <th class="text-center sticky top-0 bg-slate-100" v-for="column in visibleSubSelectedColumns" :key="column.name">{{ column.name }}</th>
+                    <th class="sticky top-0 border-b-2 border-slate-400/20 bg-slate-100 px-2.5 py-2.5 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700" v-for="column in visibleSubSelectedColumns" :key="column.name">{{ column.name }}</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr v-for="subwoofer in subwoofersSelected" :key="subwoofer.id">
-                    <td class="text-center" v-for="column in visibleSubSelectedColumns" :key="`${subwoofer.id}-selected-${column.index}`">{{ getValue(subwoofer, column.index) }}</td>
+                    <td class="border-b border-slate-400/20 px-2.5 py-2.5 text-center text-sm" v-for="column in visibleSubSelectedColumns" :key="`${subwoofer.id}-selected-${column.index}`">{{ getValue(subwoofer, column.index) }}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
-            <p v-else class="placeholder-text">No subwoofers selected yet.</p>
+            <p v-else class="text-center leading-7 text-slate-500">No subwoofers selected yet.</p>
           </section>
         </div>
       </pane>
@@ -317,312 +317,3 @@ onMounted(async () => {
   </main>
 </template>
 
-<style scoped>
-.app-shell {
-  min-height: 100vh;
-  padding: 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.hero-banner {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 1rem;
-  padding: 1.5rem 1.25rem;
-  border-radius: 1.5rem;
-  background: rgba(15, 23, 42, 0.9);
-  color: white;
-  box-shadow: 0 18px 60px rgba(15, 23, 42, 0.15);
-}
-
-.eyebrow {
-  text-transform: uppercase;
-  letter-spacing: 0.25em;
-  font-size: 0.75rem;
-  margin: 0 0 0.5rem;
-  opacity: 0.85;
-}
-
-.hero-banner h1 {
-  margin: 0;
-  font-size: clamp(2rem, 2.5vw, 2.75rem);
-}
-
-.hero-copy {
-  margin: 0.5rem 0 0;
-  max-width: 42rem;
-  color: rgba(226, 232, 240, 0.95);
-}
-
-.hero-stats {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
-}
-
-.hero-stats span {
-  font-size: 1rem;
-  font-weight: 600;
-}
-
-.pane-panel {
-  padding: 0.25rem;
-}
-
-.panel {
-  padding: 1rem;
-  border-radius: 1.25rem;
-  background: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
-}
-
-.panel-title {
-  margin: 0 0 0.75rem;
-  font-size: 1.05rem;
-  font-weight: 700;
-}
-
-.controls {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.column-controls {
-  grid-column: span 2;
-  display: grid;
-  gap: 0.65rem;
-}
-
-.column-controls-label {
-  font-size: 0.88rem;
-  color: rgb(75, 85, 99);
-  font-weight: 600;
-}
-
-.column-checkboxes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.column-checkbox {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  background: rgba(148, 163, 184, 0.12);
-  padding: 0.45rem 0.65rem;
-  border-radius: 0.85rem;
-  font-size: 0.82rem;
-  color: rgb(51, 65, 85);
-}
-
-.controls input,
-.controls select,
-.sort-toggle,
-.clear-btn {
-  border-radius: 0.85rem;
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  padding: 0.9rem 1rem;
-  font-size: 0.95rem;
-  background: white;
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.controls input:focus,
-.controls select:focus,
-.sort-toggle:focus,
-.clear-btn:focus {
-  outline: none;
-  border-color: rgb(59, 130, 246);
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.15);
-}
-
-.sort-toggle,
-.clear-btn {
-  cursor: pointer;
-  font-weight: 600;
-  color: rgb(15, 23, 42);
-  background: white;
-}
-
-.sort-toggle:hover,
-.clear-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-
-.clear-btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.table-container {
-  overflow-x: auto;
-  border-radius: 1rem;
-  background: white;
-  padding: 0.5rem;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 100%;
-}
-
-.data-table th,
-.data-table td {
-  padding: 0.8rem 0.75rem;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
-  font-size: 0.9rem;
-}
-
-.data-table th {
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-size: 0.72rem;
-  color: rgb(51, 65, 85);
-  border-bottom-width: 2px;
-}
-
-.data-row {
-  transition: background-color 0.15s ease;
-  cursor: pointer;
-}
-
-.data-row:hover {
-  background: rgb(248, 250, 252);
-}
-
-.selected-row {
-  background: rgba(16, 185, 129, 0.12);
-}
-
-.empty-row td {
-  padding: 3rem 1rem;
-  color: rgb(100, 116, 139);
-}
-
-.panel-group {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.chart-panel {
-  min-height: 24rem;
-  display: flex;
-  flex-direction: column;
-}
-
-.chart-content {
-  flex: 1;
-  display: flex;
-  align-items: stretch;
-  justify-content: center;
-  min-height: 16rem;
-  padding: 0.5rem 0;
-}
-
-.placeholder-text {
-  color: rgb(100, 116, 139);
-  text-align: center;
-  line-height: 1.7;
-}
-
-.loader-screen {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: calc(100vh - 2.5rem);
-}
-
-.loader-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1rem;
-  padding: 2rem 2.5rem;
-  border-radius: 1.25rem;
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.15);
-}
-
-.loader-spinner {
-  width: 3rem;
-  height: 3rem;
-  border-radius: 9999px;
-  border: 0.45rem solid rgba(59, 130, 246, 0.22);
-  border-top-color: rgb(59, 130, 246);
-  animation: spin 0.85s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.specs-panel {
-  overflow: hidden;
-}
-
-.data-table.compact th,
-.data-table.compact td {
-  padding: 0.65rem 0.6rem;
-}
-
-@media (max-width: 1024px) {
-  .controls {
-    grid-template-columns: 1fr;
-  }
-
-  .hero-banner {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .hero-stats {
-    width: 100%;
-    justify-content: space-between;
-  }
-}
-
-@media (max-width: 768px) {
-  .app-shell {
-    padding: 1rem;
-  }
-
-  .hero-banner {
-    padding: 1.25rem;
-  }
-
-  .pane-panel {
-    padding: 0;
-  }
-
-  .app-splitpanes {
-    min-height: auto;
-  }
-
-  .splitpanes--horizontal {
-    flex-direction: column;
-  }
-
-  .splitpanes--horizontal > .splitpanes__pane:first-child {
-    order: 2;
-  }
-
-  .splitpanes--horizontal > .splitpanes__splitter {
-    order: 3;
-  }
-
-  .splitpanes--horizontal > .splitpanes__pane:last-child {
-    order: 1;
-  }
-}
-</style>
