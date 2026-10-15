@@ -81,7 +81,7 @@ const columnDefinitions = [
 const columns = columnDefinitions.map((column) => column.name);
 const sortColumns = Object.fromEntries(columns.map((name) => [name, name]));
 const columnsSubSelected = ["Model", "Source", "Mode", "10Hz", "12.5Hz", "15Hz", "20Hz", "25Hz", "31.5Hz", "40Hz", "50Hz", "63Hz", "80Hz", "100Hz", "125Hz"];
-const visibleColumns = ref(new Set(columns));
+const visibleColumns = ref(new Set(columns.filter((name) => name !== "Drivers")));
 const columnPreferenceKey = "subwoofer-comparison:visible-columns:v1";
 
 function restoreColumnPreferences() {
