@@ -170,7 +170,10 @@ function selectSubwoofer(subwoofer) {
   if (selectedSubwooferIDs.value.includes(subwoofer.id)) return;
 
   const label = `${getValue(subwoofer, 0)} ${getValue(subwoofer, 1)}`;
-  const data = Array.from({ length: 12 }, (_, i) => parseFloat(getValue(subwoofer, i + 7)) || 0);
+  const data = Array.from({ length: 12 }, (_, i) => {
+    const output = Number.parseFloat(getValue(subwoofer, i + 7));
+    return Number.isFinite(output) ? output : null;
+  });
 
   selectedSubwooferIDs.value = [...selectedSubwooferIDs.value, subwoofer.id];
   subwoofersSelected.value.push(subwoofer);
@@ -373,9 +376,10 @@ onMounted(async () => {
         <div ref="comparisonPanel" class="comparison-panel flex flex-col gap-4" tabindex="-1">
           <section class="graph-card flex min-h-96 flex-col rounded-[1.25rem] bg-white/90 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
             <div class="graph-frame flex min-h-64 flex-1 items-stretch justify-center py-2">
-              <Graph v-if="chartData.datasets.length > 0" :chartData="chartData" />
+              <Graph v-if="chartData.datasets.length > 0" :chartData="chartData" :isMobile="isMobile" />
               <p v-else class="text-center leading-7 text-slate-500">Select one or more subwoofers to compare output curves.</p>
             </div>
+            <p v-if="isMobile && chartData.datasets.length > 0" class="text-center text-xs text-slate-500">Tap the graph to compare outputs. Differences are relative to the loudest selected curve at that frequency. Vertical scale adjusts to your selection.</p>
           </section>
 
           <section class="overflow-hidden rounded-[1.25rem] bg-white/90 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
