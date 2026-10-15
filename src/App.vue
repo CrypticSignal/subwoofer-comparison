@@ -82,6 +82,20 @@ const columns = columnDefinitions.map((column) => column.name);
 const sortColumns = Object.fromEntries(columns.map((name) => [name, name]));
 const columnsSubSelected = ["Model", "Source", "Mode", "10Hz", "12.5Hz", "15Hz", "20Hz", "25Hz", "31.5Hz", "40Hz", "50Hz", "63Hz", "80Hz", "100Hz", "125Hz"];
 const visibleColumns = ref(new Set(columns));
+const columnPreferenceKey = "subwoofer-comparison:visible-columns:v1";
+
+function restoreColumnPreferences() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(columnPreferenceKey));
+    if (!Array.isArray(saved) || !saved.every((name) => typeof name === "string")) return false;
+    const knownColumns = saved.filter((name) => columns.includes(name));
+    if (knownColumns.length === 0) return false;
+    visibleColumns.value = new Set(knownColumns);
+    return true;
+  } catch {
+    return false;
+  }
+}
 const hiddenColumns = computed(() => columns.filter((name) => !visibleColumns.value.has(name)));
 const visibleColumnsArray = computed(() => columnDefinitions.filter((column) => visibleColumns.value.has(column.name)));
 const visibleSubSelectedColumns = computed(() =>
@@ -104,6 +118,11 @@ function toggleColumnVisibility(columnName) {
     set.add(columnName);
   }
   visibleColumns.value = set;
+  try {
+    localStorage.setItem(columnPreferenceKey, JSON.stringify([...set]));
+  } catch {
+    // Visibility still works for this visit when browser storage is unavailable.
+  }
 }
 
 const fetchData = async () => {
@@ -258,7 +277,9 @@ onMounted(async () => {
   };
 
   updateMobile();
-  if (mq.matches) visibleColumns.value = new Set(["Brand", "Model", "Type", "20Hz", "31.5Hz", "50Hz"]);
+  if (!restoreColumnPreferences() && mq.matches) {
+    visibleColumns.value = new Set(["Brand", "Model", "Type", "20Hz", "31.5Hz", "50Hz"]);
+  }
   mq.addEventListener("change", updateMobile);
   removeMobileListener = () => mq.removeEventListener("change", updateMobile);
 
