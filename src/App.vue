@@ -371,8 +371,8 @@ onMounted(async () => {
 
       <pane class="selected-pane p-1 max-md:p-0">
         <div ref="comparisonPanel" class="comparison-panel flex flex-col gap-4" tabindex="-1">
-          <section class="flex min-h-96 flex-col rounded-[1.25rem] bg-white/90 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
-            <div class="flex min-h-64 flex-1 items-stretch justify-center py-2">
+          <section class="graph-card flex min-h-96 flex-col rounded-[1.25rem] bg-white/90 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
+            <div class="graph-frame flex min-h-64 flex-1 items-stretch justify-center py-2">
               <Graph v-if="chartData.datasets.length > 0" :chartData="chartData" />
               <p v-else class="text-center leading-7 text-slate-500">Select one or more subwoofers to compare output curves.</p>
             </div>
@@ -449,6 +449,15 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
+  .graph-card,
+  .graph-frame {
+    min-height: 0;
+  }
+
+  .graph-frame {
+    flex: none;
+  }
+
   .comparison-active {
     padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
   }
