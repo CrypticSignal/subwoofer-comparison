@@ -11,9 +11,8 @@ const unfilteredSubs = ref([]);
 const filterBrandText = ref("");
 const filterModelText = ref("");
 const filterType = ref("all");
-const sortBy = ref("brand");
+const sortBy = ref("Brand");
 const sortDirection = ref("asc");
-const sortColumns = { Brand: "brand", Model: "model", Type: "type", "20Hz": "output20hz" };
 
 function sortColumn(columnName) {
   const field = sortColumns[columnName];
@@ -80,6 +79,7 @@ const columnDefinitions = [
 ];
 
 const columns = columnDefinitions.map((column) => column.name);
+const sortColumns = Object.fromEntries(columns.map((name) => [name, name]));
 const columnsSubSelected = ["Model", "Source", "Mode", "10Hz", "12.5Hz", "15Hz", "20Hz", "25Hz", "31.5Hz", "40Hz", "50Hz", "63Hz", "80Hz", "100Hz", "125Hz"];
 const visibleColumns = ref(new Set(columns));
 const hiddenColumns = computed(() => columns.filter((name) => !visibleColumns.value.has(name)));
@@ -171,20 +171,22 @@ const subsFiltered = computed(() => {
     return brandMatch && modelMatch && typeMatch;
   });
 
-  const sortIndexMap = { brand: 0, model: 1, type: 4, output20hz: 10 };
-  const fieldIndex = sortIndexMap[sortBy.value];
+  const fieldIndex = columnDefinitions.find((column) => column.name === sortBy.value).index;
 
   items = [...items].sort((a, b) => {
     const aRaw = getValue(a, fieldIndex);
     const bRaw = getValue(b, fieldIndex);
 
-    if (sortBy.value === "output20hz") {
-      const aNum = Number.parseFloat(aRaw) || -Infinity;
-      const bNum = Number.parseFloat(bRaw) || -Infinity;
+    if (fieldIndex === 2 || fieldIndex === 3 || fieldIndex >= 7) {
+      const aNum = Number.parseFloat(aRaw);
+      const bNum = Number.parseFloat(bRaw);
+      // Keep absent/non-numeric measurements last in either direction.
+      if (!Number.isFinite(aNum)) return Number.isFinite(bNum) ? 1 : 0;
+      if (!Number.isFinite(bNum)) return -1;
       return sortDirection.value === "asc" ? aNum - bNum : bNum - aNum;
     }
 
-    const cmp = aRaw.localeCompare(bRaw);
+    const cmp = aRaw.localeCompare(bRaw, undefined, { numeric: true, sensitivity: "base" });
     return sortDirection.value === "asc" ? cmp : -cmp;
   });
 
