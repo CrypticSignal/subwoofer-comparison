@@ -49,7 +49,7 @@ function viewComparison() {
 }
 
 function frozenColumnClass(name) {
-  return { 'frozen-brand': name === 'Brand', 'frozen-model': name === 'Model', 'model-first': name === 'Model' && !visibleColumns.value.has('Brand') };
+  return { 'frozen-model': name === 'Model' };
 }
 
 const chartData = ref({
@@ -498,11 +498,9 @@ onMounted(async () => {
   }
 
   .catalog-scroll {
-    --brand-width: 6rem;
     --model-width: 7.5rem;
   }
 
-  .catalog-scroll .frozen-brand,
   .catalog-scroll .frozen-model {
     position: sticky;
     overflow-wrap: anywhere;
@@ -512,32 +510,19 @@ onMounted(async () => {
     background: white;
   }
 
-  .catalog-scroll .frozen-brand {
-    left: 0;
-    width: var(--brand-width);
-    min-width: var(--brand-width);
-    max-width: var(--brand-width);
-  }
-
   .catalog-scroll .frozen-model {
-    left: var(--brand-width);
+    left: 0;
     width: var(--model-width);
     min-width: var(--model-width);
     max-width: var(--model-width);
     box-shadow: 2px 0 3px rgb(15 23 42 / 0.12);
   }
 
-  .catalog-scroll .model-first {
-    left: 0;
-  }
-
-  .catalog-scroll th.frozen-brand,
   .catalog-scroll th.frozen-model {
     z-index: 30;
     background: rgb(241 245 249);
   }
 
-  .catalog-scroll tr.bg-emerald-500\/10 > .frozen-brand,
   .catalog-scroll tr.bg-emerald-500\/10 > .frozen-model {
     background: rgb(236 253 245);
   }
