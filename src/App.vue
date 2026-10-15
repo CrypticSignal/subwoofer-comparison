@@ -319,7 +319,7 @@ onMounted(async () => {
               <thead>
                 <tr>
                   <th scope="col" class="sticky top-0 z-10 border-b-2 border-slate-400/20 bg-slate-100 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700" v-for="column in visibleColumnsArray" :key="column.name" :class="frozenColumnClass(column.name)" :aria-sort="sortColumns[column.name] === sortBy ? (sortDirection === 'asc' ? 'ascending' : 'descending') : undefined">
-                    <div class="column-heading flex flex-wrap items-center justify-center gap-1">
+                    <div class="column-heading">
                       <label class="inline-flex cursor-pointer items-center gap-2 whitespace-nowrap py-1">
                         <input
                           type="checkbox"
@@ -443,6 +443,24 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.catalog-scroll th {
+  vertical-align: top;
+}
+
+.column-heading {
+  display: grid;
+  grid-template-columns: repeat(2, max-content);
+  grid-template-rows: 1.75rem 2.5rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.column-heading > label {
+  grid-column: 1 / -1;
+  justify-content: center;
+}
+
 .catalog-scroll tbody tr:focus-visible {
   outline: 2px solid rgb(37 99 235);
   outline-offset: -2px;
