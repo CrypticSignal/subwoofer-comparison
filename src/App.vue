@@ -250,12 +250,12 @@ onMounted(async () => {
             </div>
           </div>
 
-          <div class="overflow-x-auto rounded-2xl bg-white p-2">
-            <table class="w-full min-w-full border-collapse">
+          <div class="max-h-[75dvh] overflow-auto rounded-2xl bg-white p-2">
+            <table class="w-full min-w-full border-separate border-spacing-0">
               <thead>
                 <tr>
-                  <th class="sticky top-0 border-b-2 border-slate-400/20 bg-slate-100 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700">Select</th>
-                  <th class="sticky top-0 border-b-2 border-slate-400/20 bg-slate-100 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700" v-for="column in visibleColumnsArray" :key="column.name">{{ column.name }}</th>
+                  <th class="sticky top-0 z-10 border-b-2 border-slate-400/20 bg-slate-100 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700">Select</th>
+                  <th class="sticky top-0 z-10 border-b-2 border-slate-400/20 bg-slate-100 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700" v-for="column in visibleColumnsArray" :key="column.name">{{ column.name }}</th>
                 </tr>
               </thead>
               <tbody>
