@@ -228,14 +228,6 @@ function toggleSelection(subwoofer) {
   }
 }
 
-function handleChecked(event, subwoofer) {
-  if (event.target.checked) {
-    selectSubwoofer(subwoofer);
-    return;
-  }
-  deselectSubwoofer(subwoofer);
-}
-
 function clearSelections() {
   selectedSubwooferIDs.value = [];
   subwoofersSelected.value = [];
@@ -316,13 +308,13 @@ onMounted(async () => {
             <table class="w-full min-w-full border-separate border-spacing-0">
               <thead>
                 <tr>
-                  <th class="sticky top-0 z-10 border-b-2 border-slate-400/20 bg-slate-100 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700">Select</th>
                   <th scope="col" class="sticky top-0 z-10 border-b-2 border-slate-400/20 bg-slate-100 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700" v-for="column in visibleColumnsArray" :key="column.name" :class="frozenColumnClass(column.name)" :aria-sort="sortColumns[column.name] === sortBy ? (sortDirection === 'asc' ? 'ascending' : 'descending') : undefined">
                     <div class="column-heading flex flex-wrap items-center justify-center gap-1">
                       <label class="inline-flex cursor-pointer items-center gap-2 whitespace-nowrap py-1">
                         <input
                           type="checkbox"
                           :checked="visibleColumns.has(column.name)"
+                          :disabled="visibleColumns.size === 1"
                           :aria-label="`Show ${column.name} column`"
                           @change="toggleColumnVisibility(column.name)"
                         />
@@ -376,7 +368,7 @@ onMounted(async () => {
               </thead>
               <tbody>
                 <tr v-if="subsFiltered.length === 0">
-                  <td :colspan="visibleColumnsArray.length + 1" class="px-4 py-12 text-center text-slate-500">
+                  <td :colspan="visibleColumnsArray.length" class="px-4 py-12 text-center text-slate-500">
                     <p v-if="filterBrandText || filterModelText || filterType !== 'all'">No matches found.</p>
                     <p v-else>{{ dataError ? 'Subwoofer data is unavailable.' : 'No subwoofers found.' }}</p>
                   </td>
@@ -384,17 +376,13 @@ onMounted(async () => {
                 <tr
                   v-for="subwoofer in subsFiltered"
                   :key="subwoofer.id"
+                  tabindex="0"
+                  :aria-selected="isSelected(subwoofer)"
                   :class="['cursor-pointer transition-colors duration-150 hover:bg-slate-50', isSelected(subwoofer) ? 'bg-emerald-500/10' : '']"
                   @click="toggleSelection(subwoofer)"
+                  @keydown.enter.prevent="toggleSelection(subwoofer)"
+                  @keydown.space.prevent="toggleSelection(subwoofer)"
                 >
-                  <td class="border-b border-slate-400/20 px-3 py-3 text-center text-sm">
-                    <input
-                      type="checkbox"
-                      :checked="isSelected(subwoofer)"
-                      @change="(event) => handleChecked(event, subwoofer)"
-                      @click.stop
-                    />
-                  </td>
                   <td class="border-b border-slate-400/20 px-3 py-3 text-center text-sm" v-for="column in visibleColumnsArray" :class="frozenColumnClass(column.name)" :key="`${subwoofer.id}-${column.index}`">{{ getValue(subwoofer, column.index) }}</td>
                 </tr>
               </tbody>
@@ -445,6 +433,11 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.catalog-scroll tbody tr:focus-visible {
+  outline: 2px solid rgb(37 99 235);
+  outline-offset: -2px;
+}
+
 .filter-active {
   color: white;
   background: rgb(37 99 235);
