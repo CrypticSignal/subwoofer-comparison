@@ -45,6 +45,7 @@ const columnDefinitions = [
 const columns = columnDefinitions.map((column) => column.name);
 const columnsSubSelected = ["Model", "Source", "Mode", "10Hz", "12.5Hz", "15Hz", "20Hz", "25Hz", "31.5Hz", "40Hz", "50Hz", "63Hz", "80Hz", "100Hz", "125Hz"];
 const visibleColumns = ref(new Set(columns));
+const hiddenColumns = computed(() => columns.filter((name) => !visibleColumns.value.has(name)));
 const visibleColumnsArray = computed(() => columnDefinitions.filter((column) => visibleColumns.value.has(column.name)));
 const visibleSubSelectedColumns = computed(() =>
   columnsSubSelected
@@ -235,19 +236,20 @@ onMounted(async () => {
             <button class="cursor-pointer rounded-[0.85rem] border border-slate-400/35 bg-white px-4 py-3 text-[0.95rem] font-semibold text-slate-900 transition duration-200 hover:-translate-y-px focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15" @click="sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'">
               {{ sortDirection === 'asc' ? 'Ascending' : 'Descending' }}
             </button>
-            <div class="col-span-2 grid gap-3 max-lg:col-span-1">
-              <span class="text-sm font-semibold text-gray-600">Visible columns</span>
-              <div class="flex flex-wrap gap-2">
-                <label v-for="columnName in columns" :key="columnName" class="inline-flex items-center gap-1.5 rounded-[0.85rem] bg-slate-400/10 px-3 py-2 text-[0.82rem] text-slate-700">
+            <details v-if="hiddenColumns.length > 0" class="col-span-2 text-sm text-slate-700 max-lg:col-span-1">
+              <summary class="cursor-pointer py-2 font-semibold">Show hidden columns ({{ hiddenColumns.length }})</summary>
+              <div class="flex flex-wrap gap-2 pt-2">
+                <label v-for="columnName in hiddenColumns" :key="columnName" class="inline-flex cursor-pointer items-center gap-1.5 rounded-[0.85rem] bg-slate-400/10 px-3 py-2 text-[0.82rem] text-slate-700">
                   <input
                     type="checkbox"
-                    :checked="visibleColumns.has(columnName)"
+                    :checked="false"
+                    :aria-label="`Show ${columnName} column`"
                     @change="toggleColumnVisibility(columnName)"
                   />
                   <span>{{ columnName }}</span>
                 </label>
               </div>
-            </div>
+            </details>
           </div>
 
           <div class="max-h-[75dvh] overflow-auto rounded-2xl bg-white p-2">
@@ -255,7 +257,17 @@ onMounted(async () => {
               <thead>
                 <tr>
                   <th class="sticky top-0 z-10 border-b-2 border-slate-400/20 bg-slate-100 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700">Select</th>
-                  <th class="sticky top-0 z-10 border-b-2 border-slate-400/20 bg-slate-100 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700" v-for="column in visibleColumnsArray" :key="column.name">{{ column.name }}</th>
+                  <th scope="col" class="sticky top-0 z-10 border-b-2 border-slate-400/20 bg-slate-100 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700" v-for="column in visibleColumnsArray" :key="column.name">
+                    <label class="inline-flex cursor-pointer items-center gap-2 whitespace-nowrap py-1">
+                      <input
+                        type="checkbox"
+                        :checked="visibleColumns.has(column.name)"
+                        :aria-label="`Show ${column.name} column`"
+                        @change="toggleColumnVisibility(column.name)"
+                      />
+                      <span>{{ column.name }}</span>
+                    </label>
+                  </th>
                 </tr>
               </thead>
               <tbody>
