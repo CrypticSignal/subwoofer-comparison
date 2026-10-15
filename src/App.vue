@@ -211,8 +211,12 @@ onMounted(async () => {
       </div>
     </section>
 
-    <splitpanes class="default-theme max-md:min-h-0 max-md:[&.splitpanes--horizontal]:flex-col max-md:[&.splitpanes--horizontal>.splitpanes__pane:first-child]:order-2 max-md:[&.splitpanes--horizontal>.splitpanes__pane:last-child]:order-1 max-md:[&.splitpanes--horizontal>.splitpanes__splitter]:order-3" :horizontal="isMobile">
-      <pane max-size="55" class="p-1 max-md:p-0">
+    <splitpanes
+      class="default-theme comparison-layout"
+      :class="{ 'has-selection': subwoofersSelected.length > 0 }"
+      :horizontal="isMobile"
+    >
+      <pane max-size="55" class="catalog-pane p-1 max-md:p-0">
         <section class="rounded-[1.25rem] bg-white/90 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
           <div class="mb-4 grid grid-cols-2 gap-3 max-lg:grid-cols-1">
             <input v-model="filterBrandText" class="rounded-[0.85rem] border border-slate-400/35 bg-white px-4 py-3 text-[0.95rem] transition duration-200 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15" type="text" placeholder="Filter by brand" aria-label="Filter by brand" />
@@ -283,7 +287,7 @@ onMounted(async () => {
         </section>
       </pane>
 
-      <pane class="p-1 max-md:p-0">
+      <pane class="selected-pane p-1 max-md:p-0">
         <div class="flex flex-col gap-4">
           <section class="flex min-h-96 flex-col rounded-[1.25rem] bg-white/90 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
             <div class="flex min-h-64 flex-1 items-stretch justify-center py-2">
@@ -316,4 +320,28 @@ onMounted(async () => {
     </div>
   </main>
 </template>
+
+<style scoped>
+@media (max-width: 768px) {
+  .comparison-layout {
+    height: auto;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .comparison-layout > .splitpanes__pane {
+    /* Let both tables grow instead of using the splitter's percentage heights. */
+    height: auto !important;
+    overflow: visible;
+  }
+
+  .comparison-layout :deep(> .splitpanes__splitter) {
+    display: none;
+  }
+
+  .comparison-layout.has-selection > .selected-pane {
+    order: -1;
+  }
+}
+</style>
 
