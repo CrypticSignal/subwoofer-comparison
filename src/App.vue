@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, ref } from "vue";
 import Graph from "./components/Graph.vue";
 import { Splitpanes, Pane } from "splitpanes";
 import "splitpanes/dist/splitpanes.css";
@@ -25,6 +25,30 @@ function sortColumn(columnName) {
 }
 const isMobile = ref(false);
 const loading = ref(true);
+const comparisonPanel = ref(null);
+const openFilters = ref(new Set());
+
+function toggleFilter(name) {
+  const next = new Set(openFilters.value);
+  next.has(name) ? next.delete(name) : next.add(name);
+  openFilters.value = next;
+}
+
+function hasFilter(name) {
+  return name === "Brand" ? Boolean(filterBrandText.value) : name === "Model" ? Boolean(filterModelText.value) : name === "Type" && filterType.value !== "all";
+}
+
+function viewComparison() {
+  comparisonPanel.value?.focus({ preventScroll: true });
+  comparisonPanel.value?.scrollIntoView({
+    behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+    block: "start",
+  });
+}
+
+function frozenColumnClass(name) {
+  return { 'frozen-brand': name === 'Brand', 'frozen-model': name === 'Model', 'model-first': name === 'Model' && !visibleColumns.value.has('Brand') };
+}
 
 const chartData = ref({
   labels: ["10Hz", "12.5Hz", "15Hz", "20Hz", "25Hz", "31.5Hz", "40Hz", "50Hz", "63Hz", "80Hz", "100Hz", "125Hz"],
@@ -187,6 +211,9 @@ function isSelected(subwoofer) {
   return selectedSubwooferIDs.value.includes(subwoofer.id);
 }
 
+let removeMobileListener;
+onUnmounted(() => removeMobileListener?.());
+
 onMounted(async () => {
   const mq = window.matchMedia("(max-width: 768px)");
   const updateMobile = () => {
@@ -194,7 +221,9 @@ onMounted(async () => {
   };
 
   updateMobile();
+  if (mq.matches) visibleColumns.value = new Set(["Brand", "Model", "Type", "20Hz", "31.5Hz", "50Hz"]);
   mq.addEventListener("change", updateMobile);
+  removeMobileListener = () => mq.removeEventListener("change", updateMobile);
 
   try {
     const data = await fetchData();
@@ -206,7 +235,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="flex min-h-screen flex-col gap-6 p-5 max-md:p-4">
+  <main class="flex min-h-screen flex-col gap-6 p-5 max-md:p-4" :class="{ 'comparison-active': isMobile && subwoofersSelected.length > 0 }">
     <div v-if="loading" class="flex min-h-[calc(100vh-2.5rem)] items-center justify-center">
       <div class="flex flex-col items-center gap-4 rounded-[1.25rem] bg-white/95 px-10 py-8 shadow-[0_24px_60px_rgba(15,23,42,0.15)]">
         <div class="h-12 w-12 animate-spin rounded-full border-[0.45rem] border-blue-500/20 border-t-blue-500"></div>
@@ -235,7 +264,7 @@ onMounted(async () => {
       <pane max-size="55" class="catalog-pane p-1 max-md:p-0">
         <section class="rounded-[1.25rem] bg-white/90 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
           <details v-if="hiddenColumns.length > 0" class="mb-3 text-sm text-slate-700">
-            <summary class="cursor-pointer py-2 font-semibold">Show hidden columns ({{ hiddenColumns.length }})</summary>
+            <summary class="cursor-pointer py-2 font-semibold">More columns ({{ hiddenColumns.length }} hidden)</summary>
             <div class="flex flex-wrap gap-2 pt-2">
               <label v-for="columnName in hiddenColumns" :key="columnName" class="inline-flex cursor-pointer items-center gap-1.5 rounded-[0.85rem] bg-slate-400/10 px-3 py-2 text-[0.82rem] text-slate-700">
                 <input
@@ -249,13 +278,13 @@ onMounted(async () => {
             </div>
           </details>
 
-          <div class="max-h-[75dvh] overflow-auto rounded-2xl bg-white p-2">
+          <div class="catalog-scroll max-h-[75dvh] overflow-auto rounded-2xl bg-white p-2">
             <table class="w-full min-w-full border-separate border-spacing-0">
               <thead>
                 <tr>
                   <th class="sticky top-0 z-10 border-b-2 border-slate-400/20 bg-slate-100 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700">Select</th>
-                  <th scope="col" class="sticky top-0 z-10 border-b-2 border-slate-400/20 bg-slate-100 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700" v-for="column in visibleColumnsArray" :key="column.name" :aria-sort="sortColumns[column.name] === sortBy ? (sortDirection === 'asc' ? 'ascending' : 'descending') : undefined">
-                    <div class="flex items-center justify-center gap-2">
+                  <th scope="col" class="sticky top-0 z-10 border-b-2 border-slate-400/20 bg-slate-100 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700" v-for="column in visibleColumnsArray" :key="column.name" :class="frozenColumnClass(column.name)" :aria-sort="sortColumns[column.name] === sortBy ? (sortDirection === 'asc' ? 'ascending' : 'descending') : undefined">
+                    <div class="column-heading flex flex-wrap items-center justify-center gap-1">
                       <label class="inline-flex cursor-pointer items-center gap-2 whitespace-nowrap py-1">
                         <input
                           type="checkbox"
@@ -272,26 +301,42 @@ onMounted(async () => {
                         :aria-label="`Sort by ${column.name}${sortColumns[column.name] === sortBy ? (sortDirection === 'asc' ? ', currently ascending' : ', currently descending') : ''}`"
                         @click="sortColumn(column.name)"
                       >{{ sortColumns[column.name] === sortBy ? (sortDirection === 'asc' ? '↑' : '↓') : '↕' }}</button>
+                      <button
+                        v-if="['Brand', 'Model', 'Type'].includes(column.name)"
+                        type="button"
+                        class="filter-toggle rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        :class="{ 'filter-active': hasFilter(column.name) }"
+                        :aria-label="`Filter by ${column.name}${hasFilter(column.name) ? ', filter active' : ''}`"
+                        :aria-expanded="openFilters.has(column.name)"
+                        :aria-controls="`filter-${column.index}`"
+                        @click="toggleFilter(column.name)"
+                      >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3 4h18l-7 8v7l-4 2v-9z" /></svg>
+                      </button>
                     </div>
-                    <input
-                      v-if="column.name === 'Brand'"
-                      v-model="filterBrandText"
-                      class="column-filter"
-                      type="search"
-                      placeholder="Filter brand"
-                      aria-label="Filter by brand"
-                    />
-                    <input
-                      v-else-if="column.name === 'Model'"
-                      v-model="filterModelText"
-                      class="column-filter"
-                      type="search"
-                      placeholder="Filter model"
-                      aria-label="Filter by model"
-                    />
-                    <select v-else-if="column.name === 'Type'" v-model="filterType" class="column-filter" aria-label="Filter by type">
-                      <option v-for="type in availableTypes" :key="type" :value="type">{{ type === 'all' ? 'All types' : type }}</option>
-                    </select>
+                    <div v-if="openFilters.has(column.name)">
+                      <input
+                        v-if="column.name === 'Brand'"
+                        v-model="filterBrandText"
+                        :id="`filter-${column.index}`"
+                        class="column-filter"
+                        type="search"
+                        placeholder="Filter brand"
+                        aria-label="Filter by brand"
+                      />
+                      <input
+                        v-else-if="column.name === 'Model'"
+                        v-model="filterModelText"
+                        :id="`filter-${column.index}`"
+                        class="column-filter"
+                        type="search"
+                        placeholder="Filter model"
+                        aria-label="Filter by model"
+                      />
+                      <select v-else-if="column.name === 'Type'" v-model="filterType" :id="`filter-${column.index}`" class="column-filter" aria-label="Filter by type">
+                        <option v-for="type in availableTypes" :key="type" :value="type">{{ type === 'all' ? 'All types' : type }}</option>
+                      </select>
+                    </div>
                   </th>
                 </tr>
               </thead>
@@ -316,7 +361,7 @@ onMounted(async () => {
                       @click.stop
                     />
                   </td>
-                  <td class="border-b border-slate-400/20 px-3 py-3 text-center text-sm" v-for="column in visibleColumnsArray" :key="`${subwoofer.id}-${column.index}`">{{ getValue(subwoofer, column.index) }}</td>
+                  <td class="border-b border-slate-400/20 px-3 py-3 text-center text-sm" v-for="column in visibleColumnsArray" :class="frozenColumnClass(column.name)" :key="`${subwoofer.id}-${column.index}`">{{ getValue(subwoofer, column.index) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -325,7 +370,7 @@ onMounted(async () => {
       </pane>
 
       <pane class="selected-pane p-1 max-md:p-0">
-        <div class="flex flex-col gap-4">
+        <div ref="comparisonPanel" class="comparison-panel flex flex-col gap-4" tabindex="-1">
           <section class="flex min-h-96 flex-col rounded-[1.25rem] bg-white/90 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
             <div class="flex min-h-64 flex-1 items-stretch justify-center py-2">
               <Graph v-if="chartData.datasets.length > 0" :chartData="chartData" />
@@ -354,11 +399,35 @@ onMounted(async () => {
         </div>
       </pane>
     </splitpanes>
+    <button
+      v-if="isMobile && subwoofersSelected.length > 0"
+      type="button"
+      class="view-comparison rounded-full bg-blue-600 px-5 py-3 font-semibold text-white shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300"
+      @click="viewComparison"
+    >↑ View comparison ({{ subwoofersSelected.length }})</button>
     </div>
   </main>
 </template>
 
 <style scoped>
+.filter-active {
+  color: white;
+  background: rgb(37 99 235);
+}
+
+.comparison-panel {
+  scroll-margin-top: 1rem;
+}
+
+.view-comparison {
+  position: fixed;
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
+  white-space: nowrap;
+}
+
 .column-filter {
   display: block;
   width: 100%;
@@ -380,6 +449,59 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
+  .comparison-active {
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom, 0px));
+  }
+
+  .catalog-scroll {
+    --brand-width: 6rem;
+    --model-width: 7.5rem;
+  }
+
+  .catalog-scroll .frozen-brand,
+  .catalog-scroll .frozen-model {
+    position: sticky;
+    overflow-wrap: anywhere;
+    padding-left: 0.375rem;
+    padding-right: 0.375rem;
+    z-index: 20;
+    background: white;
+  }
+
+  .catalog-scroll .frozen-brand {
+    left: 0;
+    width: var(--brand-width);
+    min-width: var(--brand-width);
+    max-width: var(--brand-width);
+  }
+
+  .catalog-scroll .frozen-model {
+    left: var(--brand-width);
+    width: var(--model-width);
+    min-width: var(--model-width);
+    max-width: var(--model-width);
+    box-shadow: 2px 0 3px rgb(15 23 42 / 0.12);
+  }
+
+  .catalog-scroll .model-first {
+    left: 0;
+  }
+
+  .catalog-scroll th.frozen-brand,
+  .catalog-scroll th.frozen-model {
+    z-index: 30;
+    background: rgb(241 245 249);
+  }
+
+  .catalog-scroll tr.bg-emerald-500\/10 > .frozen-brand,
+  .catalog-scroll tr.bg-emerald-500\/10 > .frozen-model {
+    background: rgb(236 253 245);
+  }
+
+  .column-filter {
+    min-width: 0;
+  }
+
   .comparison-layout {
     height: auto;
     flex-direction: column;
