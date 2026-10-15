@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import Graph from "./components/Graph.vue";
+import { readSubwooferCache, saveSubwooferCache } from "./lib/subwooferCache.js";
 import { Splitpanes, Pane } from "splitpanes";
 import "splitpanes/dist/splitpanes.css";
 
@@ -25,6 +26,7 @@ function sortColumn(columnName) {
 }
 const isMobile = ref(false);
 const loading = ref(true);
+const dataError = ref("");
 const comparisonPanel = ref(null);
 const openFilters = ref(new Set());
 
@@ -106,18 +108,48 @@ function toggleColumnVisibility(columnName) {
 
 const fetchData = async () => {
   const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/1dU5OOnf3nVgctJszmfyBjaxK69dkXte6ZL6anVTW2_M?includeGridData=true&ranges=CEA-2010-A!A1%3ABP2214&key=${import.meta.env.VITE_API_KEY}`);
+  if (!response.ok) throw new Error("Unable to fetch subwoofer data");
   const json = await response.json();
-  const allRows = json.sheets[0].data[0].rowData;
+  const allRows = json.sheets?.[0]?.data?.[0]?.rowData;
+  if (!Array.isArray(allRows)) throw new Error("Invalid spreadsheet response");
 
   allRows.forEach((row) => row.values.splice(19, 36));
   allRows.forEach((row) => row.values.splice(2, 11));
   allRows.forEach((row) => row.values.splice(5, 2));
 
-  const subsWithOutputData = allRows.filter((row) => row.values[5].formattedValue && !row.values[5].formattedValue.includes("See tab"));
+  const subsWithOutputData = allRows.filter((row) => row.values[5]?.formattedValue && !row.values[5].formattedValue.includes("See tab"));
   subsWithOutputData.shift();
-  subsWithOutputData.forEach((sub, index) => (sub.id = index));
-  return subsWithOutputData;
+  if (subsWithOutputData.length === 0) throw new Error("No subwoofer data returned");
+  // Retain only displayed values, keeping browser storage small.
+  return subsWithOutputData.map((sub, id) => ({
+    id,
+    values: Array.from({ length: 19 }, (_, index) => ({ formattedValue: String(sub.values[index]?.formattedValue ?? "") })),
+  }));
 };
+
+async function loadData() {
+  dataError.value = "";
+  const cached = readSubwooferCache();
+  if (cached) {
+    unfilteredSubs.value = cached.rows;
+    loading.value = false;
+    if (cached.fresh) return;
+  } else {
+    loading.value = true;
+  }
+
+  try {
+    const rows = await fetchData();
+    saveSubwooferCache(rows);
+    // Spreadsheet row IDs can change. Keep an active comparison consistent;
+    // the refreshed cache will be used on the next visit.
+    if (subwoofersSelected.value.length === 0) unfilteredSubs.value = rows;
+  } catch {
+    dataError.value = cached ? "Couldn't refresh data. Showing saved subwoofer data." : "Couldn't load subwoofer data. Please try again.";
+  } finally {
+    loading.value = false;
+  }
+}
 
 function getValue(sub, index) {
   return sub.values[index]?.formattedValue || "";
@@ -228,12 +260,7 @@ onMounted(async () => {
   mq.addEventListener("change", updateMobile);
   removeMobileListener = () => mq.removeEventListener("change", updateMobile);
 
-  try {
-    const data = await fetchData();
-    unfilteredSubs.value = data;
-  } finally {
-    loading.value = false;
-  }
+  await loadData();
 });
 </script>
 
@@ -247,6 +274,10 @@ onMounted(async () => {
     </div>
 
     <div v-else>
+      <div v-if="dataError" role="status" class="mb-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
+        {{ dataError }}
+        <button type="button" class="ml-2 rounded px-2 py-1 font-semibold underline focus:ring-2 focus:ring-amber-600" @click="loadData">Retry</button>
+      </div>
       <section class="mb-6 flex items-center justify-between gap-4 rounded-3xl bg-slate-900/90 px-5 py-6 text-white shadow-[0_18px_60px_rgba(15,23,42,0.15)] max-lg:flex-col max-lg:items-start max-md:p-5">
       <div>
         <p class="mb-2 text-xs uppercase tracking-[0.25em] opacity-85">CEA-2010-A | 2m peak SPL</p>
@@ -347,7 +378,7 @@ onMounted(async () => {
                 <tr v-if="subsFiltered.length === 0">
                   <td :colspan="visibleColumnsArray.length + 1" class="px-4 py-12 text-center text-slate-500">
                     <p v-if="filterBrandText || filterModelText || filterType !== 'all'">No matches found.</p>
-                    <p v-else>Loading subwoofers...</p>
+                    <p v-else>{{ dataError ? 'Subwoofer data is unavailable.' : 'No subwoofers found.' }}</p>
                   </td>
                 </tr>
                 <tr
