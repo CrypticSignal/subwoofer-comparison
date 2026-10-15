@@ -1,6 +1,6 @@
 <template>
   <div class="chart-container" :class="{ 'mobile-chart': isMobile }">
-    <Line :key="isMobile ? 'mobile' : 'desktop'" :data="displayData" :options="options" />
+    <Line :key="isMobile ? 'mobile' : 'desktop'" :data="chartData" :options="options" />
   </div>
 </template>
 
@@ -23,22 +23,6 @@ ChartJS.register(Title, Tooltip, Legend, LineElement, PointElement, CategoryScal
 const props = defineProps({
   chartData: { type: Object, required: true },
   isMobile: { type: Boolean, default: false },
-});
-
-const colors = ["#2563eb", "#c2410c", "#047857", "#a21caf", "#0e7490", "#be123c"];
-const dashes = [[], [7, 3], [2, 3]];
-const displayData = computed(() => {
-  if (!props.isMobile) return props.chartData;
-  return {
-    ...props.chartData,
-    datasets: props.chartData.datasets.map((dataset) => ({
-      ...dataset,
-      borderColor: colors[dataset.id % colors.length],
-      backgroundColor: colors[dataset.id % colors.length],
-      borderDash: dashes[dataset.id % dashes.length],
-      pointStyle: ["circle", "triangle", "rectRot"][dataset.id % 3],
-    })),
-  };
 });
 
 const options = computed(() => {

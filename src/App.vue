@@ -191,11 +191,18 @@ const subsFiltered = computed(() => {
   return items;
 });
 
-function generateRandomHexColor() {
-  const r = Math.floor(Math.random() * 256);
-  const g = Math.floor(Math.random() * 256);
-  const b = Math.floor(Math.random() * 256);
-  return `#${r.toString(16).padStart(2, "0")}${g.toString(16).padStart(2, "0")}${b.toString(16).padStart(2, "0")}`;
+function nextChartColor() {
+  const palette = ["#2563eb", "#c2410c", "#047857", "#a21caf", "#0e7490", "#be123c"];
+  const used = new Set(chartData.value.datasets.map((dataset) => dataset.borderColor));
+  const available = palette.find((color) => !used.has(color));
+  if (available) return available;
+  // Add unique hues beyond the palette instead of repeating colours.
+  let index = 0;
+  let color;
+  do {
+    color = `hsl(${(index++ * 137.508) % 360} 70% 38%)`;
+  } while (used.has(color));
+  return color;
 }
 
 function selectSubwoofer(subwoofer) {
@@ -209,7 +216,8 @@ function selectSubwoofer(subwoofer) {
 
   selectedSubwooferIDs.value = [...selectedSubwooferIDs.value, subwoofer.id];
   subwoofersSelected.value.push(subwoofer);
-  const newDatasets = [...chartData.value.datasets, { id: subwoofer.id, label, data, borderColor: generateRandomHexColor() }];
+  const color = nextChartColor();
+  const newDatasets = [...chartData.value.datasets, { id: subwoofer.id, label, data, borderColor: color, backgroundColor: color }];
   chartData.value = { ...chartData.value, datasets: newDatasets };
 }
 
