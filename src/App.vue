@@ -12,6 +12,17 @@ const filterModelText = ref("");
 const filterType = ref("all");
 const sortBy = ref("brand");
 const sortDirection = ref("asc");
+const sortColumns = { Brand: "brand", Model: "model", Type: "type", "20Hz": "output20hz" };
+
+function sortColumn(columnName) {
+  const field = sortColumns[columnName];
+  if (sortBy.value === field) {
+    sortDirection.value = sortDirection.value === "asc" ? "desc" : "asc";
+  } else {
+    sortBy.value = field;
+    sortDirection.value = "asc";
+  }
+}
 const isMobile = ref(false);
 const loading = ref(true);
 
@@ -59,6 +70,10 @@ function toggleColumnVisibility(columnName) {
   const set = new Set(visibleColumns.value);
   if (set.has(columnName)) {
     set.delete(columnName);
+    // A hidden column must not leave an invisible filter active.
+    if (columnName === "Brand") filterBrandText.value = "";
+    if (columnName === "Model") filterModelText.value = "";
+    if (columnName === "Type") filterType.value = "all";
   } else {
     set.add(columnName);
   }
@@ -219,61 +234,71 @@ onMounted(async () => {
     >
       <pane max-size="55" class="catalog-pane p-1 max-md:p-0">
         <section class="rounded-[1.25rem] bg-white/90 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
-          <div class="mb-4 grid grid-cols-2 gap-3 max-lg:grid-cols-1">
-            <input v-model="filterBrandText" class="rounded-[0.85rem] border border-slate-400/35 bg-white px-4 py-3 text-[0.95rem] transition duration-200 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15" type="text" placeholder="Filter by brand" aria-label="Filter by brand" />
-            <input v-model="filterModelText" class="rounded-[0.85rem] border border-slate-400/35 bg-white px-4 py-3 text-[0.95rem] transition duration-200 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15" type="text" placeholder="Filter by model" aria-label="Filter by model" />
-            <select v-model="filterType" class="rounded-[0.85rem] border border-slate-400/35 bg-white px-4 py-3 text-[0.95rem] transition duration-200 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15" aria-label="Filter by type">
-              <option v-for="type in availableTypes" :key="type" :value="type">
-                {{ type === "all" ? "All types" : type }}
-              </option>
-            </select>
-            <select v-model="sortBy" class="rounded-[0.85rem] border border-slate-400/35 bg-white px-4 py-3 text-[0.95rem] transition duration-200 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15" aria-label="Sort by">
-              <option value="brand">Sort: Brand</option>
-              <option value="model">Sort: Model</option>
-              <option value="type">Sort: Type</option>
-              <option value="output20hz">Sort: 20Hz Output</option>
-            </select>
-            <button class="cursor-pointer rounded-[0.85rem] border border-slate-400/35 bg-white px-4 py-3 text-[0.95rem] font-semibold text-slate-900 transition duration-200 hover:-translate-y-px focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15" @click="sortDirection = sortDirection === 'asc' ? 'desc' : 'asc'">
-              {{ sortDirection === 'asc' ? 'Ascending' : 'Descending' }}
-            </button>
-            <details v-if="hiddenColumns.length > 0" class="col-span-2 text-sm text-slate-700 max-lg:col-span-1">
-              <summary class="cursor-pointer py-2 font-semibold">Show hidden columns ({{ hiddenColumns.length }})</summary>
-              <div class="flex flex-wrap gap-2 pt-2">
-                <label v-for="columnName in hiddenColumns" :key="columnName" class="inline-flex cursor-pointer items-center gap-1.5 rounded-[0.85rem] bg-slate-400/10 px-3 py-2 text-[0.82rem] text-slate-700">
-                  <input
-                    type="checkbox"
-                    :checked="false"
-                    :aria-label="`Show ${columnName} column`"
-                    @change="toggleColumnVisibility(columnName)"
-                  />
-                  <span>{{ columnName }}</span>
-                </label>
-              </div>
-            </details>
-          </div>
+          <details v-if="hiddenColumns.length > 0" class="mb-3 text-sm text-slate-700">
+            <summary class="cursor-pointer py-2 font-semibold">Show hidden columns ({{ hiddenColumns.length }})</summary>
+            <div class="flex flex-wrap gap-2 pt-2">
+              <label v-for="columnName in hiddenColumns" :key="columnName" class="inline-flex cursor-pointer items-center gap-1.5 rounded-[0.85rem] bg-slate-400/10 px-3 py-2 text-[0.82rem] text-slate-700">
+                <input
+                  type="checkbox"
+                  :checked="false"
+                  :aria-label="`Show ${columnName} column`"
+                  @change="toggleColumnVisibility(columnName)"
+                />
+                <span>{{ columnName }}</span>
+              </label>
+            </div>
+          </details>
 
           <div class="max-h-[75dvh] overflow-auto rounded-2xl bg-white p-2">
             <table class="w-full min-w-full border-separate border-spacing-0">
               <thead>
                 <tr>
                   <th class="sticky top-0 z-10 border-b-2 border-slate-400/20 bg-slate-100 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700">Select</th>
-                  <th scope="col" class="sticky top-0 z-10 border-b-2 border-slate-400/20 bg-slate-100 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700" v-for="column in visibleColumnsArray" :key="column.name">
-                    <label class="inline-flex cursor-pointer items-center gap-2 whitespace-nowrap py-1">
-                      <input
-                        type="checkbox"
-                        :checked="visibleColumns.has(column.name)"
-                        :aria-label="`Show ${column.name} column`"
-                        @change="toggleColumnVisibility(column.name)"
-                      />
-                      <span>{{ column.name }}</span>
-                    </label>
+                  <th scope="col" class="sticky top-0 z-10 border-b-2 border-slate-400/20 bg-slate-100 px-3 py-3 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700" v-for="column in visibleColumnsArray" :key="column.name" :aria-sort="sortColumns[column.name] === sortBy ? (sortDirection === 'asc' ? 'ascending' : 'descending') : undefined">
+                    <div class="flex items-center justify-center gap-2">
+                      <label class="inline-flex cursor-pointer items-center gap-2 whitespace-nowrap py-1">
+                        <input
+                          type="checkbox"
+                          :checked="visibleColumns.has(column.name)"
+                          :aria-label="`Show ${column.name} column`"
+                          @change="toggleColumnVisibility(column.name)"
+                        />
+                        <span>{{ column.name }}</span>
+                      </label>
+                      <button
+                        v-if="sortColumns[column.name]"
+                        type="button"
+                        class="rounded p-2 text-base hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        :aria-label="`Sort by ${column.name}${sortColumns[column.name] === sortBy ? (sortDirection === 'asc' ? ', currently ascending' : ', currently descending') : ''}`"
+                        @click="sortColumn(column.name)"
+                      >{{ sortColumns[column.name] === sortBy ? (sortDirection === 'asc' ? '↑' : '↓') : '↕' }}</button>
+                    </div>
+                    <input
+                      v-if="column.name === 'Brand'"
+                      v-model="filterBrandText"
+                      class="column-filter"
+                      type="search"
+                      placeholder="Filter brand"
+                      aria-label="Filter by brand"
+                    />
+                    <input
+                      v-else-if="column.name === 'Model'"
+                      v-model="filterModelText"
+                      class="column-filter"
+                      type="search"
+                      placeholder="Filter model"
+                      aria-label="Filter by model"
+                    />
+                    <select v-else-if="column.name === 'Type'" v-model="filterType" class="column-filter" aria-label="Filter by type">
+                      <option v-for="type in availableTypes" :key="type" :value="type">{{ type === 'all' ? 'All types' : type }}</option>
+                    </select>
                   </th>
                 </tr>
               </thead>
               <tbody>
                 <tr v-if="subsFiltered.length === 0">
                   <td :colspan="visibleColumnsArray.length + 1" class="px-4 py-12 text-center text-slate-500">
-                    <p v-if="filterBrandText || filterModelText">No matches found.</p>
+                    <p v-if="filterBrandText || filterModelText || filterType !== 'all'">No matches found.</p>
                     <p v-else>Loading subwoofers...</p>
                   </td>
                 </tr>
@@ -334,6 +359,26 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.column-filter {
+  display: block;
+  width: 100%;
+  min-width: 8rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid rgb(148 163 184 / 0.35);
+  border-radius: 0.5rem;
+  background: white;
+  font-size: 0.875rem;
+  font-weight: normal;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.column-filter:focus {
+  outline: 2px solid rgb(59 130 246);
+  outline-offset: 2px;
+}
+
 @media (max-width: 768px) {
   .comparison-layout {
     height: auto;
