@@ -83,13 +83,13 @@ const sortColumns = Object.fromEntries(columns.map((name) => [name, name]));
 const visibleColumns = ref(new Set(columns.filter((name) => name !== "Drivers")));
 const columnPreferenceKey = "subwoofer-comparison:visible-columns:v1";
 
-function restoreColumnPreferences() {
+function restoreColumnPreferences(key = columnPreferenceKey, target = visibleColumns, allowed = columns) {
   try {
-    const saved = JSON.parse(localStorage.getItem(columnPreferenceKey));
+    const saved = JSON.parse(localStorage.getItem(key));
     if (!Array.isArray(saved) || !saved.every((name) => typeof name === "string")) return false;
-    const knownColumns = saved.filter((name) => columns.includes(name));
+    const knownColumns = saved.filter((name) => allowed.includes(name));
     if (knownColumns.length === 0) return false;
-    visibleColumns.value = new Set(knownColumns);
+    target.value = new Set(knownColumns);
     return true;
   } catch {
     return false;
@@ -97,7 +97,40 @@ function restoreColumnPreferences() {
 }
 const hiddenColumns = computed(() => columns.filter((name) => !visibleColumns.value.has(name)));
 const visibleColumnsArray = computed(() => columnDefinitions.filter((column) => visibleColumns.value.has(column.name)));
-const visibleSubSelectedColumns = columnDefinitions.filter((column) => column.name === "Model" || column.index >= 7);
+const comparisonColumns = columnDefinitions.filter((column) => column.name === "Model" || column.index >= 7);
+const comparisonColumnNames = comparisonColumns.map((column) => column.name);
+const comparisonPreferenceKey = "subwoofer-comparison:comparison-columns:v1";
+const comparisonVisibleColumns = ref(new Set(comparisonColumnNames));
+const visibleSubSelectedColumns = computed(() => comparisonColumns.filter((column) => comparisonVisibleColumns.value.has(column.name)));
+const hiddenComparisonColumns = computed(() => comparisonColumnNames.filter((name) => !comparisonVisibleColumns.value.has(name)));
+const comparisonSortBy = ref("Model");
+const comparisonSortDirection = ref("asc");
+const sortedSelectedSubwoofers = computed(() => [...subwoofersSelected.value].sort((a, b) => compareRows(a, b, comparisonSortBy.value, comparisonSortDirection.value)));
+
+function toggleComparisonColumn(name) {
+  const next = new Set(comparisonVisibleColumns.value);
+  if (next.has(name)) {
+    if (next.size === 1) return;
+    next.delete(name);
+  } else {
+    next.add(name);
+  }
+  comparisonVisibleColumns.value = next;
+  try {
+    localStorage.setItem(comparisonPreferenceKey, JSON.stringify([...next]));
+  } catch {
+    // The controls still work when browser storage is unavailable.
+  }
+}
+
+function sortComparisonColumn(name) {
+  if (comparisonSortBy.value === name) {
+    comparisonSortDirection.value = comparisonSortDirection.value === "asc" ? "desc" : "asc";
+  } else {
+    comparisonSortBy.value = name;
+    comparisonSortDirection.value = "asc";
+  }
+}
 
 function toggleColumnVisibility(columnName) {
   // mutate then reassign a new Set to ensure Vue tracks the change
@@ -184,27 +217,26 @@ const subsFiltered = computed(() => {
     return brandMatch && modelMatch && typeMatch;
   });
 
-  const fieldIndex = columnDefinitions.find((column) => column.name === sortBy.value).index;
-
-  items = [...items].sort((a, b) => {
-    const aRaw = getValue(a, fieldIndex);
-    const bRaw = getValue(b, fieldIndex);
-
-    if (fieldIndex === 2 || fieldIndex === 3 || fieldIndex >= 7) {
-      const aNum = Number.parseFloat(aRaw);
-      const bNum = Number.parseFloat(bRaw);
-      // Keep absent/non-numeric measurements last in either direction.
-      if (!Number.isFinite(aNum)) return Number.isFinite(bNum) ? 1 : 0;
-      if (!Number.isFinite(bNum)) return -1;
-      return sortDirection.value === "asc" ? aNum - bNum : bNum - aNum;
-    }
-
-    const cmp = aRaw.localeCompare(bRaw, undefined, { numeric: true, sensitivity: "base" });
-    return sortDirection.value === "asc" ? cmp : -cmp;
-  });
-
-  return items;
+  return [...items].sort((a, b) => compareRows(a, b, sortBy.value, sortDirection.value));
 });
+
+function compareRows(a, b, columnName, direction) {
+  const fieldIndex = columnDefinitions.find((column) => column.name === columnName).index;
+  const aRaw = getValue(a, fieldIndex);
+  const bRaw = getValue(b, fieldIndex);
+
+  if (fieldIndex === 2 || fieldIndex === 3 || fieldIndex >= 7) {
+    const aNum = Number.parseFloat(aRaw);
+    const bNum = Number.parseFloat(bRaw);
+    // Keep absent/non-numeric measurements last in either direction.
+    if (!Number.isFinite(aNum)) return Number.isFinite(bNum) ? 1 : 0;
+    if (!Number.isFinite(bNum)) return -1;
+    return direction === "asc" ? aNum - bNum : bNum - aNum;
+  }
+
+  const cmp = aRaw.localeCompare(bRaw, undefined, { numeric: true, sensitivity: "base" });
+  return direction === "asc" ? cmp : -cmp;
+}
 
 function nextChartColor() {
   const palette = ["#2563eb", "#c2410c", "#047857", "#a21caf", "#0e7490", "#be123c"];
@@ -272,6 +304,7 @@ onMounted(async () => {
 
   updateMobile();
   restoreColumnPreferences();
+  restoreColumnPreferences(comparisonPreferenceKey, comparisonVisibleColumns, comparisonColumnNames);
   mq.addEventListener("change", updateMobile);
   removeMobileListener = () => mq.removeEventListener("change", updateMobile);
 
@@ -426,15 +459,34 @@ onMounted(async () => {
 
           <section class="overflow-hidden rounded-[1.25rem] bg-white/90 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
             <h2 class="mb-3 text-base font-bold">Selected Subwoofers</h2>
-            <div v-if="subwoofersSelected.length > 0" class="overflow-x-auto rounded-2xl bg-white p-2">
+            <details v-if="subwoofersSelected.length > 0 && hiddenComparisonColumns.length > 0" class="mb-3 text-sm text-slate-700">
+              <summary class="cursor-pointer py-2 font-semibold">More columns ({{ hiddenComparisonColumns.length }} hidden)</summary>
+              <div class="flex flex-wrap gap-2 pt-2">
+                <label v-for="name in hiddenComparisonColumns" :key="name" class="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-100 px-3 py-2">
+                  <input type="checkbox" :checked="false" :aria-label="`Show ${name} column`" @change="toggleComparisonColumn(name)" />
+                  {{ name }}
+                </label>
+              </div>
+            </details>
+            <div v-if="subwoofersSelected.length > 0" class="comparison-table overflow-x-auto rounded-2xl bg-white p-2">
               <table class="w-full min-w-full border-collapse">
                 <thead>
                   <tr>
-                    <th class="sticky top-0 border-b-2 border-slate-400/20 bg-slate-100 px-2.5 py-2.5 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700" v-for="column in visibleSubSelectedColumns" :key="column.name">{{ column.name }}</th>
+                    <th scope="col" class="sticky top-0 border-b-2 border-slate-400/20 bg-slate-100 px-2.5 py-2.5 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700" v-for="column in visibleSubSelectedColumns" :key="column.name" :aria-sort="comparisonSortBy === column.name ? (comparisonSortDirection === 'asc' ? 'ascending' : 'descending') : undefined">
+                      <div class="column-heading">
+                        <label class="inline-flex cursor-pointer items-center gap-2 whitespace-nowrap py-1">
+                          <input type="checkbox" :checked="true" :disabled="comparisonVisibleColumns.size === 1" :aria-label="`Show ${column.name} column`" @change="toggleComparisonColumn(column.name)" />
+                          <span>{{ column.name }}</span>
+                        </label>
+                        <button type="button" class="rounded p-2 text-base hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500" :aria-label="`Sort by ${column.name}${comparisonSortBy === column.name ? (comparisonSortDirection === 'asc' ? ', currently ascending' : ', currently descending') : ''}`" @click="sortComparisonColumn(column.name)">
+                          {{ comparisonSortBy === column.name ? (comparisonSortDirection === 'asc' ? '↑' : '↓') : '↕' }}
+                        </button>
+                      </div>
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="subwoofer in subwoofersSelected" :key="subwoofer.id">
+                  <tr v-for="subwoofer in sortedSelectedSubwoofers" :key="subwoofer.id">
                     <td class="border-b border-slate-400/20 px-2.5 py-2.5 text-center text-sm" v-for="column in visibleSubSelectedColumns" :key="`${subwoofer.id}-selected-${column.index}`">{{ getValue(subwoofer, column.index) }}</td>
                   </tr>
                 </tbody>
