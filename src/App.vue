@@ -1,8 +1,9 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import Graph from "./components/Graph.vue";
 import { readSubwooferCache, saveSubwooferCache } from "./lib/subwooferCache.js";
 import { parseSpreadsheetRows } from "./lib/spreadsheet.js";
+import { comparisonUrl, parseSelection, resolveSelection, selectionReferences } from "./lib/comparisonSelection.js";
 import { Splitpanes, Pane } from "splitpanes";
 import "splitpanes/dist/splitpanes.css";
 
@@ -35,6 +36,69 @@ const lastFetchedLabel = computed(() => lastFetched.value ? new Intl.DateTimeFor
 }).format(lastFetched.value) : "Not yet fetched");
 const comparisonPanel = ref(null);
 const openFilters = ref(new Set());
+const selectionStorageKey = "subwoofer-comparison:selection:v1";
+const selectionNotice = ref("");
+const shareStatus = ref("");
+const shareLink = ref("");
+const shareLinkInput = ref(null);
+let initialSelection = [];
+let selectionsRestored = false;
+
+function readInitialSelection() {
+  const hash = new URLSearchParams(window.location.hash.slice(1));
+  if (hash.has("compare")) {
+    const shared = parseSelection(hash.get("compare"));
+    if (!shared) selectionNotice.value = "This comparison link could not be read. Select subwoofers to start a new comparison.";
+    return shared || [];
+  }
+  try {
+    return parseSelection(localStorage.getItem(selectionStorageKey)) || [];
+  } catch {
+    return [];
+  }
+}
+
+function restoreSelections() {
+  if (selectionsRestored) return;
+  const matches = resolveSelection(initialSelection, unfilteredSubs.value);
+  for (const row of matches) selectSubwoofer(row);
+  selectionsRestored = true;
+  if (matches.length < initialSelection.length) {
+    selectionNotice.value = "Some saved subwoofers are no longer available. The remaining selections have been restored.";
+  }
+}
+
+watch(() => subwoofersSelected.value.map((sub) => sub.id), () => {
+  if (!selectionsRestored) return;
+  const refs = selectionReferences(subwoofersSelected.value, unfilteredSubs.value);
+  try {
+    localStorage.setItem(selectionStorageKey, JSON.stringify(refs));
+  } catch {
+    // Selections can still be shared when browser storage is unavailable.
+  }
+  try {
+    window.history.replaceState(window.history.state, "", comparisonUrl(window.location.href, refs));
+  } catch {
+    // Sharing still works if updating the address bar is unavailable.
+  }
+  shareStatus.value = "";
+  shareLink.value = "";
+});
+
+async function shareComparison() {
+  const url = comparisonUrl(window.location.href, selectionReferences(subwoofersSelected.value, unfilteredSubs.value));
+  try {
+    await navigator.clipboard.writeText(url);
+    shareStatus.value = "Comparison link copied.";
+    shareLink.value = "";
+  } catch {
+    shareLink.value = url;
+    shareStatus.value = "Copy this link to share your comparison.";
+    await nextTick();
+    shareLinkInput.value?.focus();
+    shareLinkInput.value?.select();
+  }
+}
 
 function toggleFilter(name) {
   const next = new Set(openFilters.value);
@@ -187,17 +251,15 @@ const fetchData = async () => {
 function applyFetchedRows(rows) {
   // Row positions can change in the sheet. Match selections by their identifying
   // fields, then rebuild their outputs while keeping existing graph colours.
-  const identity = (sub) => JSON.stringify(sub.values.slice(0, 7).map((cell) => cell.formattedValue));
-  const byIdentity = new Map();
-  for (const row of rows) {
-    const key = identity(row);
-    if (!byIdentity.has(key)) byIdentity.set(key, []);
-    byIdentity.get(key).push(row);
+  if (!selectionsRestored) {
+    unfilteredSubs.value = rows;
+    restoreSelections();
+    return;
   }
-  const matches = subwoofersSelected.value.map((old) => ({
-    old,
-    current: byIdentity.get(identity(old))?.shift(),
-  })).filter((match) => match.current);
+  const matches = subwoofersSelected.value.flatMap((old) => {
+    const current = resolveSelection(selectionReferences([old], unfilteredSubs.value), rows)[0];
+    return current ? [{ old, current }] : [];
+  });
   const previousDatasets = new Map(chartData.value.datasets.map((dataset) => [dataset.id, dataset]));
   unfilteredSubs.value = rows;
   subwoofersSelected.value = matches.map((match) => match.current);
@@ -214,6 +276,7 @@ async function loadData(force = false) {
   if (cached && unfilteredSubs.value.length === 0) {
     unfilteredSubs.value = cached.rows;
     lastFetched.value = cached.savedAt;
+    restoreSelections();
   }
   if (unfilteredSubs.value.length > 0) {
     loading.value = false;
@@ -340,9 +403,22 @@ function isSelected(subwoofer) {
 }
 
 let removeMobileListener;
-onUnmounted(() => removeMobileListener?.());
+function restoreLocationSelection() {
+  selectionNotice.value = "";
+  initialSelection = readInitialSelection();
+  selectionsRestored = false;
+  clearSelections();
+  if (unfilteredSubs.value.length) restoreSelections();
+}
+
+onUnmounted(() => {
+  removeMobileListener?.();
+  window.removeEventListener("hashchange", restoreLocationSelection);
+});
 
 onMounted(async () => {
+  initialSelection = readInitialSelection();
+  window.addEventListener("hashchange", restoreLocationSelection);
   const mq = window.matchMedia("(max-width: 768px)");
   const updateMobile = () => {
     isMobile.value = mq.matches;
@@ -381,6 +457,7 @@ onMounted(async () => {
     </div>
 
     <div v-else>
+      <p v-if="selectionNotice" role="status" class="mb-4 rounded-xl bg-blue-50 p-3 text-sm text-blue-900">{{ selectionNotice }}</p>
       <div v-if="dataError" role="status" class="mb-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
         {{ dataError }}
         <button type="button" class="ml-2 rounded px-2 py-1 font-semibold underline focus:ring-2 focus:ring-amber-600 disabled:opacity-50" :disabled="fetching" @click="loadData(true)">Retry</button>
@@ -530,7 +607,15 @@ onMounted(async () => {
           </section>
 
           <section class="overflow-hidden rounded-[1.25rem] bg-white/90 p-4 shadow-[0_12px_32px_rgba(15,23,42,0.08)]">
-            <h2 class="mb-3 text-base font-bold">Selected Subwoofers</h2>
+            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 class="text-base font-bold">Selected Subwoofers</h2>
+              <button type="button" class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" :disabled="subwoofersSelected.length === 0" @click="shareComparison">Share comparison</button>
+            </div>
+            <p v-if="shareStatus" role="status" class="mb-2 text-sm text-slate-600">{{ shareStatus }}</p>
+            <input v-if="shareLink" ref="shareLinkInput" :value="shareLink" readonly aria-label="Comparison link" class="mb-3 w-full rounded-lg border border-slate-300 p-2 text-sm" @focus="$event.target.select()" />
+            <div v-if="subwoofersSelected.length && !comparisonVisibleColumns.has('Model')" class="mb-3 flex flex-wrap gap-2">
+              <button v-for="sub in subwoofersSelected" :key="sub.id" type="button" class="rounded-lg bg-slate-100 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500" :aria-label="`Remove ${getValue(sub, 0)} ${getValue(sub, 1)} from comparison`" @click="deselectSubwoofer(sub)">{{ getValue(sub, 1) }} ×</button>
+            </div>
             <details v-if="subwoofersSelected.length > 0 && hiddenComparisonColumns.length > 0" class="mb-3 text-sm text-slate-700">
               <summary class="cursor-pointer py-2 font-semibold">More columns ({{ hiddenComparisonColumns.length }} hidden)</summary>
               <div class="flex flex-wrap gap-2 pt-2">
@@ -541,10 +626,10 @@ onMounted(async () => {
               </div>
             </details>
             <div v-if="subwoofersSelected.length > 0" class="comparison-table overflow-x-auto rounded-2xl bg-white p-2">
-              <table class="w-full min-w-full border-collapse">
+              <table class="w-full min-w-full border-separate border-spacing-0">
                 <thead>
                   <tr>
-                    <th scope="col" class="sticky top-0 border-b-2 border-slate-400/20 bg-slate-100 px-2.5 py-2.5 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700" v-for="column in visibleSubSelectedColumns" :key="column.name" :aria-sort="comparisonSortBy === column.name ? (comparisonSortDirection === 'asc' ? 'ascending' : 'descending') : undefined">
+                    <th scope="col" class="sticky top-0 border-b-2 border-slate-400/20 bg-slate-100 px-2.5 py-2.5 text-center text-xs font-bold uppercase tracking-[0.08em] text-slate-700" v-for="column in visibleSubSelectedColumns" :key="column.name" :class="{ 'comparison-model': column.name === 'Model' }" :aria-sort="comparisonSortBy === column.name ? (comparisonSortDirection === 'asc' ? 'ascending' : 'descending') : undefined">
                       <div class="column-heading">
                         <label class="inline-flex cursor-pointer items-center gap-2 whitespace-nowrap py-1">
                           <input type="checkbox" :checked="true" :disabled="comparisonVisibleColumns.size === 1" :aria-label="`Show ${column.name} column`" @change="toggleComparisonColumn(column.name)" />
@@ -559,7 +644,13 @@ onMounted(async () => {
                 </thead>
                 <tbody>
                   <tr v-for="subwoofer in sortedSelectedSubwoofers" :key="subwoofer.id">
-                    <td class="border-b border-slate-400/20 px-2.5 py-2.5 text-center text-sm" v-for="column in visibleSubSelectedColumns" :key="`${subwoofer.id}-selected-${column.index}`" :class="{ 'font-semibold text-green-700': isHighestOutput(subwoofer, column) }" :title="isHighestOutput(subwoofer, column) ? 'Highest output among selected subwoofers at this frequency' : undefined">{{ getValue(subwoofer, column.index) }}</td>
+                    <td class="border-b border-slate-400/20 px-2.5 py-2.5 text-center text-sm" v-for="column in visibleSubSelectedColumns" :key="`${subwoofer.id}-selected-${column.index}`" :class="{ 'font-semibold text-green-700': isHighestOutput(subwoofer, column), 'comparison-model': column.name === 'Model' }" :title="isHighestOutput(subwoofer, column) ? 'Highest output among selected subwoofers at this frequency' : undefined">
+                      <div v-if="column.name === 'Model'" class="flex items-center justify-between gap-2">
+                        <span>{{ getValue(subwoofer, column.index) }}</span>
+                        <button type="button" class="shrink-0 rounded-lg px-3 py-2 text-lg text-slate-600 hover:bg-red-50 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-blue-500" :aria-label="`Remove ${getValue(subwoofer, 0)} ${getValue(subwoofer, 1)} from comparison`" :title="`Remove ${getValue(subwoofer, 1)}`" @click="deselectSubwoofer(subwoofer)">×</button>
+                      </div>
+                      <template v-else>{{ getValue(subwoofer, column.index) }}</template>
+                    </td>
                   </tr>
                 </tbody>
               </table>
@@ -580,6 +671,22 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.comparison-table .comparison-model {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  min-width: 9rem;
+  max-width: 12rem;
+  overflow-wrap: anywhere;
+  background: white;
+  box-shadow: 2px 0 3px rgb(15 23 42 / 0.12);
+}
+
+.comparison-table th.comparison-model {
+  z-index: 20;
+  background: rgb(241 245 249);
+}
+
 .catalog-scroll th {
   vertical-align: top;
 }
