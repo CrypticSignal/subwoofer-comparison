@@ -106,6 +106,19 @@ const hiddenComparisonColumns = computed(() => comparisonColumnNames.filter((nam
 const comparisonSortBy = ref("Model");
 const comparisonSortDirection = ref("asc");
 const sortedSelectedSubwoofers = computed(() => [...subwoofersSelected.value].sort((a, b) => compareRows(a, b, comparisonSortBy.value, comparisonSortDirection.value)));
+const highestSelectedOutputs = computed(() => {
+  const highest = new Map();
+  for (const column of comparisonColumns.filter((column) => column.index >= 7)) {
+    const values = subwoofersSelected.value.map((sub) => Number.parseFloat(getValue(sub, column.index))).filter(Number.isFinite);
+    if (values.length) highest.set(column.index, Math.max(...values));
+  }
+  return highest;
+});
+
+function isHighestOutput(sub, column) {
+  const output = Number.parseFloat(getValue(sub, column.index));
+  return column.index >= 7 && Number.isFinite(output) && output === highestSelectedOutputs.value.get(column.index);
+}
 
 function toggleComparisonColumn(name) {
   const next = new Set(comparisonVisibleColumns.value);
@@ -487,7 +500,7 @@ onMounted(async () => {
                 </thead>
                 <tbody>
                   <tr v-for="subwoofer in sortedSelectedSubwoofers" :key="subwoofer.id">
-                    <td class="border-b border-slate-400/20 px-2.5 py-2.5 text-center text-sm" v-for="column in visibleSubSelectedColumns" :key="`${subwoofer.id}-selected-${column.index}`">{{ getValue(subwoofer, column.index) }}</td>
+                    <td class="border-b border-slate-400/20 px-2.5 py-2.5 text-center text-sm" v-for="column in visibleSubSelectedColumns" :key="`${subwoofer.id}-selected-${column.index}`" :class="{ 'font-semibold text-green-700': isHighestOutput(subwoofer, column) }" :title="isHighestOutput(subwoofer, column) ? 'Highest output among selected subwoofers at this frequency' : undefined">{{ getValue(subwoofer, column.index) }}</td>
                   </tr>
                 </tbody>
               </table>
