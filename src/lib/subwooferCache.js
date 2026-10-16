@@ -1,4 +1,4 @@
-const CACHE_KEY = 'subwoofer-comparison:data:v2';
+const CACHE_KEY = 'subwoofer-comparison:data:v3';
 const MAX_AGE = 60 * 60 * 1000;
 
 export function readSubwooferCache() {

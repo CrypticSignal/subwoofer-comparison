@@ -30,6 +30,18 @@ test('includes first measured row, blank-source and See tab rows, zero and last-
   assert.deepEqual(input, before, 'parsing must not mutate API data');
 });
 
+test('excludes Others references without excluding other sources or blank sources', () => {
+  const parsed = parseSpreadsheetRows([
+    row('Excluded', { 0: '110' }, 'See tab "Others"'),
+    row('Whitespace', { 0: '111' }, ' \nSee tab "Others"\n '),
+    row('Measured', { 0: '100' }, 'Lab'),
+    row('Other reference', { 0: '101' }, 'See tab "Data-Bass"'),
+    row('No source', { 0: '102' }),
+  ]);
+  assert.deepEqual(parsed.map((sub) => sub.values[1].formattedValue), ['Measured', 'Other reference', 'No source']);
+  assert.deepEqual(parsed.map((sub) => sub.id), [0, 1, 2]);
+});
+
 test('excludes empty rows, headers, source-only rows, notes and errors', () => {
   const header = row('Model', { 0: '10', 1: '12.5' });
   header.values[0] = { formattedValue: 'Brand' };

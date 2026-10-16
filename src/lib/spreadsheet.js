@@ -14,6 +14,7 @@ export function parseSpreadsheetRows(rows) {
       // Reject headers, notes, errors and missing cells; zero is valid output.
       return { formattedValue: Number.isFinite(number) ? String(number) : '' };
     });
+    if (values[5].formattedValue.trim() === 'See tab "Others"') continue;
     if (!values.slice(7).some((cell) => cell.formattedValue !== '')) continue;
     if (values[0].formattedValue.trim().toLowerCase() === 'brand'
       && values[1].formattedValue.trim().toLowerCase() === 'model') continue;
