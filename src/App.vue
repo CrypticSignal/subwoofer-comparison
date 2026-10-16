@@ -126,6 +126,13 @@ const chartData = ref({
   labels: ["10Hz", "12.5Hz", "15Hz", "20Hz", "25Hz", "31.5Hz", "40Hz", "50Hz", "63Hz", "80Hz", "100Hz", "125Hz"],
   datasets: [],
 });
+const comparisonColors = computed(() => new Map(chartData.value.datasets.map((dataset) => [dataset.id, dataset.borderColor])));
+
+function chartLabel(subwoofer) {
+  const name = `${getValue(subwoofer, 0)} ${getValue(subwoofer, 1)}`;
+  const mode = getValue(subwoofer, 6).trim();
+  return mode ? `${name} (${mode})` : name;
+}
 
 const columnDefinitions = [
   { name: "Brand", index: 0 },
@@ -274,7 +281,7 @@ function applyFetchedRows(rows) {
   subwoofersSelected.value = matches.map((match) => match.current);
   selectedSubwooferIDs.value = matches.map((match) => match.current.id);
   chartData.value = { ...chartData.value, datasets: matches.map(({ old, current }) => ({
-    ...previousDatasets.get(old.id), id: current.id, data: outputData(current),
+    ...previousDatasets.get(old.id), id: current.id, label: chartLabel(current), data: outputData(current),
   })) };
 }
 
@@ -376,7 +383,7 @@ function outputData(subwoofer) {
 function selectSubwoofer(subwoofer) {
   if (selectedSubwooferIDs.value.includes(subwoofer.id)) return;
 
-  const label = `${getValue(subwoofer, 0)} ${getValue(subwoofer, 1)}`;
+  const label = chartLabel(subwoofer);
   const data = outputData(subwoofer);
 
   selectedSubwooferIDs.value = [...selectedSubwooferIDs.value, subwoofer.id];
@@ -656,7 +663,10 @@ onMounted(async () => {
                   <tr v-for="subwoofer in sortedSelectedSubwoofers" :key="subwoofer.id">
                     <td class="border-b border-slate-400/20 px-2.5 py-2.5 text-center text-sm" v-for="column in visibleSubSelectedColumns" :key="`${subwoofer.id}-selected-${column.index}`" :class="{ 'font-semibold text-green-700': isHighestOutput(subwoofer, column), 'comparison-model': column.name === 'Model' }" :title="isHighestOutput(subwoofer, column) ? 'Highest output among selected subwoofers at this frequency' : undefined">
                       <div v-if="column.name === 'Model'" class="flex items-center justify-between gap-2">
-                        <span>{{ getValue(subwoofer, column.index) }}</span>
+                        <span class="inline-flex items-center gap-2">
+                          <span aria-hidden="true" class="h-3 w-3 shrink-0 rounded-full" :style="{ backgroundColor: comparisonColors.get(subwoofer.id) }"></span>
+                          <span>{{ getValue(subwoofer, column.index) }}</span>
+                        </span>
                         <button type="button" class="shrink-0 rounded-lg px-3 py-2 text-lg text-slate-600 hover:bg-red-50 hover:text-red-700 focus:outline-none focus:ring-2 focus:ring-blue-500" :aria-label="`Remove ${getValue(subwoofer, 0)} ${getValue(subwoofer, 1)} from comparison`" :title="`Remove ${getValue(subwoofer, 1)}`" @click="deselectSubwoofer(subwoofer)">×</button>
                       </div>
                       <template v-else>
