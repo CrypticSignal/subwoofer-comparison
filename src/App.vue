@@ -11,6 +11,7 @@ const unfilteredSubs = ref([]);
 const filterBrandText = ref("");
 const filterModelText = ref("");
 const filterType = ref("all");
+const filterSource = ref("");
 const sortBy = ref("Brand");
 const sortDirection = ref("asc");
 
@@ -36,7 +37,7 @@ function toggleFilter(name) {
 }
 
 function hasFilter(name) {
-  return name === "Brand" ? Boolean(filterBrandText.value) : name === "Model" ? Boolean(filterModelText.value) : name === "Type" && filterType.value !== "all";
+  return name === "Brand" ? Boolean(filterBrandText.value) : name === "Model" ? Boolean(filterModelText.value) : name === "Source" ? Boolean(filterSource.value) : name === "Type" && filterType.value !== "all";
 }
 
 function viewComparison() {
@@ -154,6 +155,7 @@ function toggleColumnVisibility(columnName) {
     if (columnName === "Brand") filterBrandText.value = "";
     if (columnName === "Model") filterModelText.value = "";
     if (columnName === "Type") filterType.value = "all";
+    if (columnName === "Source") filterSource.value = "";
   } else {
     set.add(columnName);
   }
@@ -218,6 +220,7 @@ const availableTypes = computed(() => {
   const types = new Set(unfilteredSubs.value.map((sub) => getValue(sub, 4)).filter(Boolean));
   return ["all", ...Array.from(types).sort((a, b) => a.localeCompare(b))];
 });
+const availableSources = computed(() => [...new Set(unfilteredSubs.value.map((sub) => getValue(sub, 5)).filter(Boolean))].sort((a, b) => a.localeCompare(b)));
 
 const subsFiltered = computed(() => {
   let items = unfilteredSubs.value.filter((sub) => {
@@ -227,7 +230,8 @@ const subsFiltered = computed(() => {
     const brandMatch = brand.includes(filterBrandText.value.toLowerCase());
     const modelMatch = model.includes(filterModelText.value.toLowerCase());
     const typeMatch = filterType.value === "all" || type === filterType.value;
-    return brandMatch && modelMatch && typeMatch;
+    const sourceMatch = !filterSource.value || getValue(sub, 5) === filterSource.value;
+    return brandMatch && modelMatch && typeMatch && sourceMatch;
   });
 
   return [...items].sort((a, b) => compareRows(a, b, sortBy.value, sortDirection.value));
@@ -410,7 +414,7 @@ onMounted(async () => {
                         @click="sortColumn(column.name)"
                       >{{ sortColumns[column.name] === sortBy ? (sortDirection === 'asc' ? '↑' : '↓') : '↕' }}</button>
                       <button
-                        v-if="['Brand', 'Model', 'Type'].includes(column.name)"
+                        v-if="['Brand', 'Model', 'Type', 'Source'].includes(column.name)"
                         type="button"
                         class="filter-toggle rounded p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
                         :class="{ 'filter-active': hasFilter(column.name) }"
@@ -444,6 +448,10 @@ onMounted(async () => {
                       <select v-else-if="column.name === 'Type'" v-model="filterType" :id="`filter-${column.index}`" class="column-filter" aria-label="Filter by type">
                         <option v-for="type in availableTypes" :key="type" :value="type">{{ type === 'all' ? 'All types' : type }}</option>
                       </select>
+                      <select v-else-if="column.name === 'Source'" v-model="filterSource" :id="`filter-${column.index}`" class="column-filter" aria-label="Filter by source">
+                        <option value="">All sources</option>
+                        <option v-for="source in availableSources" :key="source" :value="source">{{ source }}</option>
+                      </select>
                     </div>
                   </th>
                 </tr>
@@ -451,7 +459,7 @@ onMounted(async () => {
               <tbody>
                 <tr v-if="subsFiltered.length === 0">
                   <td :colspan="visibleColumnsArray.length" class="px-4 py-12 text-center text-slate-500">
-                    <p v-if="filterBrandText || filterModelText || filterType !== 'all'">No matches found.</p>
+                    <p v-if="filterBrandText || filterModelText || filterType !== 'all' || filterSource">No matches found.</p>
                     <p v-else>{{ dataError ? 'Subwoofer data is unavailable.' : 'No subwoofers found.' }}</p>
                   </td>
                 </tr>
