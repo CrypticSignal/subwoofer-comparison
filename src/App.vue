@@ -80,7 +80,6 @@ const columnDefinitions = [
 
 const columns = columnDefinitions.map((column) => column.name);
 const sortColumns = Object.fromEntries(columns.map((name) => [name, name]));
-const columnsSubSelected = ["Model", "Source", "Mode", "10Hz", "12.5Hz", "15Hz", "20Hz", "25Hz", "31.5Hz", "40Hz", "50Hz", "63Hz", "80Hz", "100Hz", "125Hz"];
 const visibleColumns = ref(new Set(columns.filter((name) => name !== "Drivers")));
 const columnPreferenceKey = "subwoofer-comparison:visible-columns:v1";
 
@@ -98,12 +97,7 @@ function restoreColumnPreferences() {
 }
 const hiddenColumns = computed(() => columns.filter((name) => !visibleColumns.value.has(name)));
 const visibleColumnsArray = computed(() => columnDefinitions.filter((column) => visibleColumns.value.has(column.name)));
-const visibleSubSelectedColumns = computed(() =>
-  columnsSubSelected
-    .map((name) => columnDefinitions.find((column) => column.name === name))
-    .filter(Boolean)
-    .filter((column) => visibleColumns.value.has(column.name))
-);
+const visibleSubSelectedColumns = columnDefinitions.filter((column) => column.name === "Model" || column.index >= 7);
 
 function toggleColumnVisibility(columnName) {
   // mutate then reassign a new Set to ensure Vue tracks the change
