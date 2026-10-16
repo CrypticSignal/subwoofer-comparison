@@ -176,7 +176,6 @@ const visibleSubSelectedColumns = computed(() => comparisonColumns.filter((colum
 const hiddenComparisonColumns = computed(() => comparisonColumnNames.filter((name) => !comparisonVisibleColumns.value.has(name)));
 const comparisonSortBy = ref("Model");
 const comparisonSortDirection = ref("asc");
-const showOutputDifferences = ref(false);
 const sortedSelectedSubwoofers = computed(() => [...subwoofersSelected.value].sort((a, b) => compareRows(a, b, comparisonSortBy.value, comparisonSortDirection.value)));
 const highestSelectedOutputs = computed(() => {
   const highest = new Map();
@@ -198,7 +197,7 @@ function outputDifference(sub, column) {
   const highest = highestSelectedOutputs.value.get(column.index);
   if (!Number.isFinite(output) || !Number.isFinite(highest)) return null;
   const gap = (highest - output).toFixed(1);
-  return gap === "0.0" ? "0.0 dB" : `−${gap} dB`;
+  return gap === "0.0" ? null : `−${gap} dB`;
 }
 
 function toggleComparisonColumn(name) {
@@ -621,11 +620,7 @@ onMounted(async () => {
               <h2 class="text-base font-bold">Selected Subwoofers</h2>
               <button type="button" class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" :disabled="subwoofersSelected.length === 0" @click="shareComparison">Share comparison</button>
             </div>
-            <label v-if="subwoofersSelected.length" class="mb-3 inline-flex cursor-pointer items-center gap-2 py-2 text-sm text-slate-700">
-              <input v-model="showOutputDifferences" type="checkbox" />
-              Show dB differences
-            </label>
-            <p v-if="showOutputDifferences && subwoofersSelected.length" class="mb-3 text-xs text-slate-500">Differences are relative to the highest selected output at each frequency.</p>
+            <p v-if="subwoofersSelected.length" class="mb-3 text-xs text-slate-500">Differences are relative to the highest selected output at each frequency.</p>
             <p v-if="shareStatus" role="status" class="mb-2 text-sm text-slate-600">{{ shareStatus }}</p>
             <input v-if="shareLink" ref="shareLinkInput" :value="shareLink" readonly aria-label="Comparison link" class="mb-3 w-full rounded-lg border border-slate-300 p-2 text-sm" @focus="$event.target.select()" />
             <div v-if="subwoofersSelected.length && !comparisonVisibleColumns.has('Model')" class="mb-3 flex flex-wrap gap-2">
@@ -666,7 +661,7 @@ onMounted(async () => {
                       </div>
                       <template v-else>
                         {{ getValue(subwoofer, column.index) }}
-                        <span v-if="showOutputDifferences && outputDifference(subwoofer, column) !== null" class="block whitespace-nowrap text-xs font-normal text-slate-500">({{ outputDifference(subwoofer, column) }})</span>
+                        <span v-if="outputDifference(subwoofer, column) !== null" class="block whitespace-nowrap text-xs font-normal text-slate-500">({{ outputDifference(subwoofer, column) }})</span>
                       </template>
                     </td>
                   </tr>
