@@ -62,8 +62,8 @@ const columnDefinitions = [
   { name: "Drivers", index: 2 },
   { name: "Driver Size", index: 3 },
   { name: "Type", index: 4 },
-  { name: "Source", index: 5 },
   { name: "Mode", index: 6 },
+  { name: "Source", index: 5 },
   { name: "10Hz", index: 7 },
   { name: "12.5Hz", index: 8 },
   { name: "15Hz", index: 9 },
@@ -97,9 +97,9 @@ function restoreColumnPreferences(key = columnPreferenceKey, target = visibleCol
 }
 const hiddenColumns = computed(() => columns.filter((name) => !visibleColumns.value.has(name)));
 const visibleColumnsArray = computed(() => columnDefinitions.filter((column) => visibleColumns.value.has(column.name)));
-const comparisonColumns = columnDefinitions.filter((column) => column.name === "Model" || column.name === "Mode" || column.index >= 7);
+const comparisonColumns = columnDefinitions.filter((column) => ["Model", "Mode", "Source"].includes(column.name) || column.index >= 7);
 const comparisonColumnNames = comparisonColumns.map((column) => column.name);
-const comparisonPreferenceKey = "subwoofer-comparison:comparison-columns:v2";
+const comparisonPreferenceKey = "subwoofer-comparison:comparison-columns:v3";
 const comparisonVisibleColumns = ref(new Set(comparisonColumnNames));
 const visibleSubSelectedColumns = computed(() => comparisonColumns.filter((column) => comparisonVisibleColumns.value.has(column.name)));
 const hiddenComparisonColumns = computed(() => comparisonColumnNames.filter((name) => !comparisonVisibleColumns.value.has(name)));
@@ -317,14 +317,18 @@ onMounted(async () => {
 
   updateMobile();
   restoreColumnPreferences();
-  if (!restoreColumnPreferences(comparisonPreferenceKey, comparisonVisibleColumns, comparisonColumnNames)
-    && restoreColumnPreferences("subwoofer-comparison:comparison-columns:v1", comparisonVisibleColumns, comparisonColumnNames)) {
-    // Add the new column once while retaining previous visibility choices.
-    comparisonVisibleColumns.value.add("Mode");
-    try {
-      localStorage.setItem(comparisonPreferenceKey, JSON.stringify([...comparisonVisibleColumns.value]));
-    } catch {
-      // The column still works when browser storage is unavailable.
+  if (!restoreColumnPreferences(comparisonPreferenceKey, comparisonVisibleColumns, comparisonColumnNames)) {
+    const fromV2 = restoreColumnPreferences("subwoofer-comparison:comparison-columns:v2", comparisonVisibleColumns, comparisonColumnNames);
+    const fromV1 = !fromV2 && restoreColumnPreferences("subwoofer-comparison:comparison-columns:v1", comparisonVisibleColumns, comparisonColumnNames);
+    if (fromV2 || fromV1) {
+      // Add newly available columns once without resetting saved choices.
+      comparisonVisibleColumns.value.add("Source");
+      if (fromV1) comparisonVisibleColumns.value.add("Mode");
+      try {
+        localStorage.setItem(comparisonPreferenceKey, JSON.stringify([...comparisonVisibleColumns.value]));
+      } catch {
+        // The columns still work when browser storage is unavailable.
+      }
     }
   }
   mq.addEventListener("change", updateMobile);
