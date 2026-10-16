@@ -7,16 +7,16 @@ export function readSubwooferCache() {
     if (!cached || !Number.isFinite(cached.savedAt) || cached.savedAt > Date.now() || !Array.isArray(cached.rows) || cached.rows.length === 0) return null;
     const valid = cached.rows.every((row, index) => row?.id === index && Array.isArray(row.values) && row.values.length === 19 && row.values.every((cell) => typeof cell?.formattedValue === 'string'));
     if (!valid) return null;
-    return { rows: cached.rows, fresh: Date.now() - cached.savedAt < MAX_AGE };
+    return { rows: cached.rows, savedAt: cached.savedAt, fresh: Date.now() - cached.savedAt < MAX_AGE };
   } catch {
     // Storage can be unavailable, full, or contain an outdated/corrupt entry.
     return null;
   }
 }
 
-export function saveSubwooferCache(rows) {
+export function saveSubwooferCache(rows, savedAt = Date.now()) {
   try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt: Date.now(), rows }));
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ savedAt, rows }));
   } catch {
     // Caching is optional; fetched data still works when storage is blocked/full.
   }

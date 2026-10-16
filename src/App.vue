@@ -28,6 +28,11 @@ function sortColumn(columnName) {
 const isMobile = ref(false);
 const loading = ref(true);
 const dataError = ref("");
+const fetching = ref(false);
+const lastFetched = ref(null);
+const lastFetchedLabel = computed(() => lastFetched.value ? new Intl.DateTimeFormat(undefined, {
+  dateStyle: "medium", timeStyle: "short",
+}).format(lastFetched.value) : "Not yet fetched");
 const comparisonPanel = ref(null);
 const openFilters = ref(new Set());
 
@@ -173,32 +178,61 @@ const fetchData = async () => {
   url.searchParams.set("ranges", "'CEA-2010-A'!A:BP");
   url.searchParams.set("fields", "sheets(data(rowData(values(formattedValue,effectiveValue))))");
   url.searchParams.set("key", import.meta.env.VITE_API_KEY);
-  const response = await fetch(url);
+  const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) throw new Error("Unable to fetch subwoofer data");
   const json = await response.json();
   return parseSpreadsheetRows(json.sheets?.[0]?.data?.[0]?.rowData);
 };
 
-async function loadData() {
+function applyFetchedRows(rows) {
+  // Row positions can change in the sheet. Match selections by their identifying
+  // fields, then rebuild their outputs while keeping existing graph colours.
+  const identity = (sub) => JSON.stringify(sub.values.slice(0, 7).map((cell) => cell.formattedValue));
+  const byIdentity = new Map();
+  for (const row of rows) {
+    const key = identity(row);
+    if (!byIdentity.has(key)) byIdentity.set(key, []);
+    byIdentity.get(key).push(row);
+  }
+  const matches = subwoofersSelected.value.map((old) => ({
+    old,
+    current: byIdentity.get(identity(old))?.shift(),
+  })).filter((match) => match.current);
+  const previousDatasets = new Map(chartData.value.datasets.map((dataset) => [dataset.id, dataset]));
+  unfilteredSubs.value = rows;
+  subwoofersSelected.value = matches.map((match) => match.current);
+  selectedSubwooferIDs.value = matches.map((match) => match.current.id);
+  chartData.value = { ...chartData.value, datasets: matches.map(({ old, current }) => ({
+    ...previousDatasets.get(old.id), id: current.id, data: outputData(current),
+  })) };
+}
+
+async function loadData(force = false) {
+  if (fetching.value) return;
   dataError.value = "";
   const cached = readSubwooferCache();
-  if (cached) {
+  if (cached && unfilteredSubs.value.length === 0) {
     unfilteredSubs.value = cached.rows;
+    lastFetched.value = cached.savedAt;
+  }
+  if (unfilteredSubs.value.length > 0) {
     loading.value = false;
-    if (cached.fresh) return;
+    if (!force && cached?.fresh) return;
   } else {
     loading.value = true;
   }
 
+  fetching.value = true;
   try {
     const rows = await fetchData();
-    saveSubwooferCache(rows);
-    // Spreadsheet row IDs can change. Keep an active comparison consistent;
-    // the refreshed cache will be used on the next visit.
-    if (subwoofersSelected.value.length === 0) unfilteredSubs.value = rows;
+    const fetchedAt = Date.now();
+    applyFetchedRows(rows);
+    lastFetched.value = fetchedAt;
+    saveSubwooferCache(rows, fetchedAt);
   } catch {
-    dataError.value = cached ? "Couldn't refresh data. Showing saved subwoofer data." : "Couldn't load subwoofer data. Please try again.";
+    dataError.value = unfilteredSubs.value.length ? "Couldn't refresh data. Showing previously fetched subwoofer data." : "Couldn't load subwoofer data. Please try again.";
   } finally {
+    fetching.value = false;
     loading.value = false;
   }
 }
@@ -260,14 +294,18 @@ function nextChartColor() {
   return color;
 }
 
+function outputData(subwoofer) {
+  return Array.from({ length: 12 }, (_, i) => {
+    const output = Number.parseFloat(getValue(subwoofer, i + 7));
+    return Number.isFinite(output) ? output : null;
+  });
+}
+
 function selectSubwoofer(subwoofer) {
   if (selectedSubwooferIDs.value.includes(subwoofer.id)) return;
 
   const label = `${getValue(subwoofer, 0)} ${getValue(subwoofer, 1)}`;
-  const data = Array.from({ length: 12 }, (_, i) => {
-    const output = Number.parseFloat(getValue(subwoofer, i + 7));
-    return Number.isFinite(output) ? output : null;
-  });
+  const data = outputData(subwoofer);
 
   selectedSubwooferIDs.value = [...selectedSubwooferIDs.value, subwoofer.id];
   subwoofersSelected.value.push(subwoofer);
@@ -345,7 +383,7 @@ onMounted(async () => {
     <div v-else>
       <div v-if="dataError" role="status" class="mb-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">
         {{ dataError }}
-        <button type="button" class="ml-2 rounded px-2 py-1 font-semibold underline focus:ring-2 focus:ring-amber-600" @click="loadData">Retry</button>
+        <button type="button" class="ml-2 rounded px-2 py-1 font-semibold underline focus:ring-2 focus:ring-amber-600 disabled:opacity-50" :disabled="fetching" @click="loadData(true)">Retry</button>
       </div>
       <section class="mb-6 flex items-center justify-between gap-4 rounded-3xl bg-slate-900/90 px-5 py-6 text-white shadow-[0_18px_60px_rgba(15,23,42,0.15)] max-lg:flex-col max-lg:items-start max-md:p-5">
       <div>
@@ -358,6 +396,15 @@ onMounted(async () => {
         <button class="cursor-pointer rounded-[0.85rem] border border-slate-400/35 bg-white px-4 py-3 text-[0.95rem] font-semibold text-slate-900 transition duration-200 hover:-translate-y-px hover:disabled:translate-y-0 focus:border-blue-500 focus:outline-none focus:ring-4 focus:ring-blue-500/15 disabled:cursor-not-allowed disabled:opacity-55" @click="clearSelections" :disabled="subwoofersSelected.length === 0">Clear selection</button>
       </div>
     </section>
+
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+      <p role="status">
+        Last fetched:
+        <time v-if="lastFetched" :datetime="new Date(lastFetched).toISOString()" :title="new Date(lastFetched).toString()">{{ lastFetchedLabel }}</time>
+        <span v-else>{{ lastFetchedLabel }}</span>
+      </p>
+      <button type="button" class="rounded-xl border border-slate-300 bg-white px-4 py-2 font-semibold text-slate-800 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50" :disabled="fetching" :aria-busy="fetching" @click="loadData(true)">{{ fetching ? 'Refreshing…' : 'Refresh data' }}</button>
+    </div>
 
     <splitpanes
       class="default-theme comparison-layout"
