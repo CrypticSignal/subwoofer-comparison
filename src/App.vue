@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import Graph from "./components/Graph.vue";
 import { readSubwooferCache, saveSubwooferCache } from "./lib/subwooferCache.js";
+import { parseSpreadsheetRows } from "./lib/spreadsheet.js";
 import { Splitpanes, Pane } from "splitpanes";
 import "splitpanes/dist/splitpanes.css";
 
@@ -168,24 +169,14 @@ function toggleColumnVisibility(columnName) {
 }
 
 const fetchData = async () => {
-  const response = await fetch(`https://sheets.googleapis.com/v4/spreadsheets/1dU5OOnf3nVgctJszmfyBjaxK69dkXte6ZL6anVTW2_M?includeGridData=true&ranges=CEA-2010-A!A1%3ABP2214&key=${import.meta.env.VITE_API_KEY}`);
+  const url = new URL("https://sheets.googleapis.com/v4/spreadsheets/1dU5OOnf3nVgctJszmfyBjaxK69dkXte6ZL6anVTW2_M");
+  url.searchParams.set("ranges", "'CEA-2010-A'!A:BP");
+  url.searchParams.set("fields", "sheets(data(rowData(values(formattedValue,effectiveValue))))");
+  url.searchParams.set("key", import.meta.env.VITE_API_KEY);
+  const response = await fetch(url);
   if (!response.ok) throw new Error("Unable to fetch subwoofer data");
   const json = await response.json();
-  const allRows = json.sheets?.[0]?.data?.[0]?.rowData;
-  if (!Array.isArray(allRows)) throw new Error("Invalid spreadsheet response");
-
-  allRows.forEach((row) => row.values.splice(19, 36));
-  allRows.forEach((row) => row.values.splice(2, 11));
-  allRows.forEach((row) => row.values.splice(5, 2));
-
-  const subsWithOutputData = allRows.filter((row) => row.values[5]?.formattedValue && !row.values[5].formattedValue.includes("See tab"));
-  subsWithOutputData.shift();
-  if (subsWithOutputData.length === 0) throw new Error("No subwoofer data returned");
-  // Retain only displayed values, keeping browser storage small.
-  return subsWithOutputData.map((sub, id) => ({
-    id,
-    values: Array.from({ length: 19 }, (_, index) => ({ formattedValue: String(sub.values[index]?.formattedValue ?? "") })),
-  }));
+  return parseSpreadsheetRows(json.sheets?.[0]?.data?.[0]?.rowData);
 };
 
 async function loadData() {
