@@ -97,9 +97,9 @@ function restoreColumnPreferences(key = columnPreferenceKey, target = visibleCol
 }
 const hiddenColumns = computed(() => columns.filter((name) => !visibleColumns.value.has(name)));
 const visibleColumnsArray = computed(() => columnDefinitions.filter((column) => visibleColumns.value.has(column.name)));
-const comparisonColumns = columnDefinitions.filter((column) => column.name === "Model" || column.index >= 7);
+const comparisonColumns = columnDefinitions.filter((column) => column.name === "Model" || column.name === "Mode" || column.index >= 7);
 const comparisonColumnNames = comparisonColumns.map((column) => column.name);
-const comparisonPreferenceKey = "subwoofer-comparison:comparison-columns:v1";
+const comparisonPreferenceKey = "subwoofer-comparison:comparison-columns:v2";
 const comparisonVisibleColumns = ref(new Set(comparisonColumnNames));
 const visibleSubSelectedColumns = computed(() => comparisonColumns.filter((column) => comparisonVisibleColumns.value.has(column.name)));
 const hiddenComparisonColumns = computed(() => comparisonColumnNames.filter((name) => !comparisonVisibleColumns.value.has(name)));
@@ -317,7 +317,16 @@ onMounted(async () => {
 
   updateMobile();
   restoreColumnPreferences();
-  restoreColumnPreferences(comparisonPreferenceKey, comparisonVisibleColumns, comparisonColumnNames);
+  if (!restoreColumnPreferences(comparisonPreferenceKey, comparisonVisibleColumns, comparisonColumnNames)
+    && restoreColumnPreferences("subwoofer-comparison:comparison-columns:v1", comparisonVisibleColumns, comparisonColumnNames)) {
+    // Add the new column once while retaining previous visibility choices.
+    comparisonVisibleColumns.value.add("Mode");
+    try {
+      localStorage.setItem(comparisonPreferenceKey, JSON.stringify([...comparisonVisibleColumns.value]));
+    } catch {
+      // The column still works when browser storage is unavailable.
+    }
+  }
   mq.addEventListener("change", updateMobile);
   removeMobileListener = () => mq.removeEventListener("change", updateMobile);
 
