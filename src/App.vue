@@ -277,9 +277,7 @@ onMounted(async () => {
   };
 
   updateMobile();
-  if (!restoreColumnPreferences() && mq.matches) {
-    visibleColumns.value = new Set(["Brand", "Model", "Type", "20Hz", "31.5Hz", "50Hz"]);
-  }
+  restoreColumnPreferences();
   mq.addEventListener("change", updateMobile);
   removeMobileListener = () => mq.removeEventListener("change", updateMobile);
 
