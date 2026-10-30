@@ -66,14 +66,14 @@ npm run build
 # Preview the production build locally
 npm run preview
 
-# Run spreadsheet parsing tests
-node --test tests/spreadsheet.test.js
+# Run the unit tests
+npm test
 ```
 
 Provide `VITE_API_KEY` when building, either through `.env` or the build environment.
 
 ## Deployment
 
-The GitHub Actions workflow in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) builds pushes to `main` with Node.js 24 and publishes `dist/` to the `gh-pages` branch. Configure the repository's `VITE_API_KEY` Actions secret and GitHub Pages to serve that branch.
+Pull requests are tested and built by [`.github/workflows/ci.yml`](.github/workflows/ci.yml). The GitHub Actions workflow in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) tests and builds pushes to `main` with Node.js 24 and publishes `dist/` to the `gh-pages` branch. Configure the repository's `VITE_API_KEY` Actions secret and GitHub Pages to serve that branch.
 
 For a manual deployment, `npm run deploy` builds the site and publishes `dist/` using the `gh-pages` package. The Vite base path is `/subwoofer-comparison/`; update `base` in [`vite.config.js`](vite.config.js) if hosting under a different path.
