@@ -26,40 +26,24 @@ const props = defineProps({
 });
 
 const options = computed(() => {
-  if (!props.isMobile) return { responsive: true };
-
   const values = props.chartData.datasets.flatMap((dataset) => dataset.data).filter(Number.isFinite);
   const bounds = values.length ? {
     min: Math.floor((Math.min(...values) - 2) / 2) * 2,
     max: Math.ceil((Math.max(...values) + 2) / 2) * 2,
   } : {};
 
-  return {
+  const options = {
     responsive: true,
-    maintainAspectRatio: false,
     interaction: { mode: "index", intersect: false, axis: "x" },
-    elements: {
-      line: { borderWidth: 2.5 },
-      point: { radius: 3, hoverRadius: 6, hitRadius: 20 },
-    },
     scales: {
-      x: {
-        ticks: { maxTicksLimit: 6, maxRotation: 0 },
-        grid: { display: false },
-      },
       y: {
         ...bounds,
         title: { display: true, text: "Output (dB SPL)" },
-        ticks: { maxTicksLimit: 8 },
       },
     },
     plugins: {
-      legend: {
-        position: "bottom",
-        labels: { usePointStyle: true, boxWidth: 8, boxHeight: 8, padding: 12 },
-      },
       tooltip: {
-        // Keep comparisons visible: tapping a frequency shows every visible curve.
+        // Keep comparisons visible: hovering or tapping a frequency shows every visible curve.
         callbacks: {
           label(context) {
             const output = context.parsed.y;
@@ -71,6 +55,30 @@ const options = computed(() => {
             return `${context.dataset.label}: ${output.toFixed(1)} dB${gap > 0.05 ? ` (−${gap.toFixed(1)} dB)` : ""}`;
           },
         },
+      },
+    },
+  };
+  if (!props.isMobile) return options;
+
+  return {
+    ...options,
+    maintainAspectRatio: false,
+    elements: {
+      line: { borderWidth: 2.5 },
+      point: { radius: 3, hoverRadius: 6, hitRadius: 20 },
+    },
+    scales: {
+      x: {
+        ticks: { maxTicksLimit: 6, maxRotation: 0 },
+        grid: { display: false },
+      },
+      y: { ...options.scales.y, ticks: { maxTicksLimit: 8 } },
+    },
+    plugins: {
+      ...options.plugins,
+      legend: {
+        position: "bottom",
+        labels: { usePointStyle: true, boxWidth: 8, boxHeight: 8, padding: 12 },
       },
     },
   };
