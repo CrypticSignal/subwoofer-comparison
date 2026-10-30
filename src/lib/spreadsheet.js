@@ -2,6 +2,26 @@
 // Keep application indexes stable even though display order can change.
 const COLUMN_INDEXES = [0, 1, 13, 14, 15, 18, 55, ...Array.from({ length: 12 }, (_, i) => 56 + i)];
 
+// Fetch only the columns above rather than the whole A:BP range.
+export const SHEET_RANGES = ['A:B', 'N:P', 'S:S', 'BD:BP'].map((range) => `'CEA-2010-A'!${range}`);
+
+// Combine one GridData block per range back into rows at their original sheet positions.
+export function mergeGridData(blocks) {
+  if (!Array.isArray(blocks)) throw new Error('Invalid spreadsheet response');
+  const rows = [];
+  for (const block of blocks) {
+    const startRow = block?.startRow ?? 0;
+    const startColumn = block?.startColumn ?? 0;
+    (block?.rowData ?? []).forEach((rowData, rowOffset) => {
+      const row = rows[startRow + rowOffset] ??= { values: [] };
+      (rowData?.values ?? []).forEach((cell, columnOffset) => {
+        row.values[startColumn + columnOffset] = cell;
+      });
+    });
+  }
+  return Array.from(rows, (row) => row ?? {});
+}
+
 export function parseSpreadsheetRows(rows) {
   if (!Array.isArray(rows)) throw new Error('Invalid spreadsheet response');
   const result = [];

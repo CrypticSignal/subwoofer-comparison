@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseSpreadsheetRows } from '../src/lib/spreadsheet.js';
+import { mergeGridData, parseSpreadsheetRows } from '../src/lib/spreadsheet.js';
 
 function row(model, outputs = {}, source = '') {
   const values = [];
@@ -59,4 +59,21 @@ test('includes measurements beyond the former row 2214 limit', () => {
 test('rejects invalid or empty spreadsheet data', () => {
   assert.throws(() => parseSpreadsheetRows(undefined), /Invalid spreadsheet/);
   assert.throws(() => parseSpreadsheetRows([{}, row('Empty')]), /No subwoofer output/);
+});
+
+test('merges per-range grid data back into original sheet columns', () => {
+  const cells = (...values) => ({ values: values.map((value) => ({ formattedValue: value })) });
+  const rows = mergeGridData([
+    { rowData: [cells('Brand', 'Model'), cells('Brand A', 'Merged')] },
+    { startColumn: 13, rowData: [{}, cells('2', '12', 'Sealed')] },
+    { startColumn: 18, rowData: [{}, cells('Lab')] },
+    { startColumn: 55, rowData: [{}, cells('Standard', '100'), {}, cells('', '', '', '', '', '', '', '', '', '', '', '', '112')] },
+  ]);
+  assert.equal(rows.length, 4);
+  assert.deepEqual(rows[2].values ?? [], []);
+  const parsed = parseSpreadsheetRows(rows);
+  assert.equal(parsed.length, 2);
+  assert.deepEqual(parsed[0].values.slice(0, 8).map((cell) => cell.formattedValue), ['Brand A', 'Merged', '2', '12', 'Sealed', 'Lab', 'Standard', '100']);
+  assert.equal(parsed[1].values[18].formattedValue, '112');
+  assert.throws(() => mergeGridData(undefined), /Invalid spreadsheet/);
 });

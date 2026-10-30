@@ -2,7 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
 import Graph from "./components/Graph.vue";
 import { readSubwooferCache, saveSubwooferCache } from "./lib/subwooferCache.js";
-import { parseSpreadsheetRows } from "./lib/spreadsheet.js";
+import { mergeGridData, parseSpreadsheetRows, SHEET_RANGES } from "./lib/spreadsheet.js";
 import { comparisonUrl, parseSelection, resolveSelection, selectionReferences } from "./lib/comparisonSelection.js";
 import { Splitpanes, Pane } from "splitpanes";
 import "splitpanes/dist/splitpanes.css";
@@ -255,13 +255,13 @@ function toggleColumnVisibility(columnName) {
 
 const fetchData = async () => {
   const url = new URL("https://sheets.googleapis.com/v4/spreadsheets/1dU5OOnf3nVgctJszmfyBjaxK69dkXte6ZL6anVTW2_M");
-  url.searchParams.set("ranges", "'CEA-2010-A'!A:BP");
-  url.searchParams.set("fields", "sheets(data(rowData(values(formattedValue,effectiveValue))))");
+  for (const range of SHEET_RANGES) url.searchParams.append("ranges", range);
+  url.searchParams.set("fields", "sheets(data(startRow,startColumn,rowData(values(formattedValue,effectiveValue))))");
   url.searchParams.set("key", import.meta.env.VITE_API_KEY);
   const response = await fetch(url, { cache: "no-store" });
   if (!response.ok) throw new Error("Unable to fetch subwoofer data");
   const json = await response.json();
-  return parseSpreadsheetRows(json.sheets?.[0]?.data?.[0]?.rowData);
+  return parseSpreadsheetRows(mergeGridData(json.sheets?.[0]?.data));
 };
 
 function applyFetchedRows(rows) {
