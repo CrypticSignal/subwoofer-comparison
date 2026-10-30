@@ -24,7 +24,7 @@ Data is cached in browser local storage for one hour. On a later visit, older ca
 
 ## Run locally
 
-Use Node.js 20 (the version used by the deployment workflow) and npm.
+Use Node.js 24 (the version used by the deployment workflow) and npm.
 
 1. Clone the repository and install dependencies:
 
@@ -74,6 +74,6 @@ Provide `VITE_API_KEY` when building, either through `.env` or the build environ
 
 ## Deployment
 
-The GitHub Actions workflow in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) builds pushes to `main` with Node.js 20 and publishes `dist/` to the `gh-pages` branch. Configure the repository's `VITE_API_KEY` Actions secret and GitHub Pages to serve that branch.
+The GitHub Actions workflow in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) builds pushes to `main` with Node.js 24 and publishes `dist/` to the `gh-pages` branch. Configure the repository's `VITE_API_KEY` Actions secret and GitHub Pages to serve that branch.
 
 For a manual deployment, `npm run deploy` builds the site and publishes `dist/` using the `gh-pages` package. The Vite base path is `/subwoofer-comparison/`; update `base` in [`vite.config.js`](vite.config.js) if hosting under a different path.
